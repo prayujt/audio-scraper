@@ -1,0 +1,16 @@
+app: audio-scraper
+services:
+  - name: api
+    public: true
+    template: http
+    image: docker.prayujt.com/audio-scraper
+    network:
+      ports:
+        - 8080
+    env:
+      - name: API_PORT
+        value: 8080
+      - name: SPOTIFY_CLIENT_ID
+        value: ${SPOTIFY_CLIENT_ID}
+      - name: SPOTIFY_CLIENT_SECRET
+        value: ${SPOTIFY_CLIENT_SECRET}
