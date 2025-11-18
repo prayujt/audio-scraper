@@ -32,3 +32,7 @@ func (s *Logger) Warn(msg string, args ...any) {
 func (s *Logger) Error(msg string, args ...any) {
 	s.l.Error(msg, args...)
 }
+
+func (s *Logger) With(args ...any) ports.Logger {
+	return &Logger{l: s.l.With(args...)}
+}

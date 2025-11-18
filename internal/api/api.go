@@ -2,22 +2,27 @@
 package api
 
 import (
+	"encoding/json"
 	"net/http"
 
+	"github.com/zmb3/spotify/v2"
+
+	"audio-scraper/internal/logger"
 	"audio-scraper/internal/ports"
 )
 
 type Deps struct {
-	Log ports.Logger
-	Sp  ports.SpotifyProvider
+	Log     ports.Logger
+	Spotify ports.SpotifyProvider
 }
 
 type Handlers struct {
-	log ports.Logger
+	log     ports.Logger
+	spotify ports.SpotifyProvider
 }
 
 func NewHandlers(deps *Deps) *Handlers {
-	return &Handlers{log: deps.Log}
+	return &Handlers{log: deps.Log, spotify: deps.Spotify}
 }
 
 func (h *Handlers) HealthHandler(w http.ResponseWriter, r *http.Request) {
@@ -27,8 +32,23 @@ func (h *Handlers) HealthHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handlers) Search(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusNotImplemented)
-	w.Write([]byte("Search endpoint not implemented"))
+	ctx := r.Context()
+	log := h.log.With("handler", "Search")
+	query := r.URL.Query().Get("q")
+	if query == "" {
+		log.Warn("search query parameter 'q' is missing")
+		http.Error(w, "missing query parameter 'q'", http.StatusBadRequest)
+		return
+	}
+	log = h.log.With("query", query)
+	results, err := h.spotify.Search(logger.Into(ctx, log), query, spotify.SearchTypePlaylist|spotify.SearchTypeAlbum)
+	if err != nil {
+		log.Error("spotify search failed", "err", err)
+		http.Error(w, "spotify search failed", http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(results)
 }
 
 func (h *Handlers) Download(w http.ResponseWriter, r *http.Request) {
