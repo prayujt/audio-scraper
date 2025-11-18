@@ -1,3 +1,4 @@
+// Package api implements HTTP handlers for the audio scraper service.
 package api
 
 import (
@@ -6,27 +7,31 @@ import (
 	"audio-scraper/internal/ports"
 )
 
-type handlers struct {
+type Deps struct {
+	Log ports.Logger
+	Sp  ports.SpotifyProvider
+}
+
+type Handlers struct {
 	log ports.Logger
 }
 
-func NewHandlers(l ports.Logger) ports.Handlers {
-	return &handlers{log: l}
+func NewHandlers(deps *Deps) *Handlers {
+	return &Handlers{log: deps.Log}
 }
 
-func (h *handlers) Log() ports.Logger { return h.log }
-
-func (h *handlers) HealthHandler(w http.ResponseWriter, r *http.Request) {
+func (h *Handlers) HealthHandler(w http.ResponseWriter, r *http.Request) {
+	h.log.Info("received request to health check endpoint")
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("OK"))
 }
 
-func (h *handlers) Search(w http.ResponseWriter, r *http.Request) {
+func (h *Handlers) Search(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 	w.Write([]byte("Search endpoint not implemented"))
 }
 
-func (h *handlers) Download(w http.ResponseWriter, r *http.Request) {
+func (h *Handlers) Download(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 	w.Write([]byte("Download endpoint not implemented"))
 }

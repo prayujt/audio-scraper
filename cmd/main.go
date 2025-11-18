@@ -10,6 +10,7 @@ import (
 
 	"audio-scraper/internal/api"
 	"audio-scraper/internal/logger"
+	"audio-scraper/internal/providers"
 )
 
 func main() {
@@ -21,7 +22,11 @@ func main() {
 	}
 	log.Info("started server", "host", "0.0.0.0", "port", port)
 
-	h := api.NewHandlers(log)
+	s := providers.NewSpotifyClient(log)
+	h := api.NewHandlers(&api.Deps{
+		Log: log,
+		Sp:  s,
+	})
 	router := mux.NewRouter()
 	router.HandleFunc("/", h.HealthHandler).Methods("GET")
 	router.HandleFunc("/search", h.Search).Methods("GET")
