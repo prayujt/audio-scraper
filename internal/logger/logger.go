@@ -13,7 +13,9 @@ type Logger struct {
 }
 
 func NewLogger() ports.Logger {
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	}))
 	return &Logger{l: logger}
 }
 
