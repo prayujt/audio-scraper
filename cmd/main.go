@@ -9,8 +9,10 @@ import (
 	"github.com/gorilla/mux"
 
 	"audio-scraper/internal/api"
+	"audio-scraper/internal/constants"
 	"audio-scraper/internal/logger"
 	"audio-scraper/internal/providers"
+	"audio-scraper/internal/services"
 )
 
 func main() {
@@ -28,10 +30,13 @@ func main() {
 	}
 	st := providers.NewStoreProvider(log)
 
+	q := services.NewDownloadWorkerPool(constants.DownloadWorkerPoolSize, log)
+
 	h := api.NewHandlers(&api.Deps{
 		Log:     log,
 		Spotify: sp,
 		Store:   st,
+		Queue:   q,
 	})
 	router := mux.NewRouter()
 	router.HandleFunc("/", h.HealthHandler).Methods("GET")

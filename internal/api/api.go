@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/zmb3/spotify/v2"
 
+	"audio-scraper/internal/constants"
 	"audio-scraper/internal/logger"
 	"audio-scraper/internal/models"
 	"audio-scraper/internal/ports"
@@ -19,16 +20,18 @@ type Deps struct {
 	Log     ports.Logger
 	Spotify ports.SpotifyProvider
 	Store   ports.StoreProvider
+	Queue   ports.DownloadQueue
 }
 
 type Handlers struct {
 	log     ports.Logger
 	spotify ports.SpotifyProvider
 	store   ports.StoreProvider
+	queue   ports.DownloadQueue
 }
 
 func NewHandlers(deps *Deps) *Handlers {
-	return &Handlers{log: deps.Log, spotify: deps.Spotify, store: deps.Store}
+	return &Handlers{log: deps.Log, spotify: deps.Spotify, store: deps.Store, queue: deps.Queue}
 }
 
 func (h *Handlers) HealthHandler(w http.ResponseWriter, r *http.Request) {
@@ -116,6 +119,20 @@ func (h *Handlers) Download(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		log.Info("processing choice", "type", c.Type, "id", c.ID)
+
+		deps := addToQueueDeps{
+			log: log,
+			sp:  h.spotify,
+			q:   h.queue,
+		}
+		switch c.Type {
+		case constants.SpotifyEntityTypeTrack:
+			addTrackToQueue(deps, req.RequestID, c.ID)
+		case constants.SpotifyEntityTypeAlbum:
+			addAlbumToQueue(deps, req.RequestID, c.ID)
+		case constants.SpotifyEntityTypeArtist:
+			addArtistToQueue(deps, req.RequestID, c.ID)
+		}
 	}
 
 	w.WriteHeader(http.StatusOK)
