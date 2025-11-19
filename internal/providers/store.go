@@ -12,7 +12,7 @@ const cleanupInterval = 30 * time.Minute
 const storeTTL = 10 * time.Minute
 
 type choiceItem struct {
-	choices   []models.Choice
+	choices   map[string]models.Choice
 	timestamp time.Time
 }
 
@@ -34,7 +34,7 @@ func NewStoreProvider(l ports.Logger) ports.StoreProvider {
 	return store
 }
 
-func (s *storeClient) Set(key string, choices []models.Choice) {
+func (s *storeClient) Set(key string, choices map[string]models.Choice) {
 	s.log.Info("storing data in store", "key", key)
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -44,7 +44,7 @@ func (s *storeClient) Set(key string, choices []models.Choice) {
 	}
 }
 
-func (s *storeClient) Get(key string) ([]models.Choice, bool) {
+func (s *storeClient) Get(key string) (map[string]models.Choice, bool) {
 	s.log.Info("retrieving data from store", "key", key)
 	s.mu.RLock()
 	defer s.mu.RUnlock()

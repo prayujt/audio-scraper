@@ -3,6 +3,7 @@ package api
 
 import (
 	"encoding/json"
+	"maps"
 	"net/http"
 	"strings"
 
@@ -48,7 +49,7 @@ func (h *Handlers) Search(w http.ResponseWriter, r *http.Request) {
 	}
 	queries := strings.Split(searchQuery, ",")
 
-	var allChoices []models.Choice
+	allChoices := make(map[string]models.Choice)
 	for _, query := range queries {
 		query = strings.TrimSpace(query)
 		if query == "" {
@@ -70,14 +71,14 @@ func (h *Handlers) Search(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		allChoices = append(allChoices, choices...)
+		maps.Copy(allChoices, choices)
 	}
 
 	h.store.Set(requestID, allChoices)
 
 	var labels []string
-	for _, choice := range allChoices {
-		labels = append(labels, choice.Label)
+	for label := range allChoices {
+		labels = append(labels, label)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -88,6 +89,34 @@ func (h *Handlers) Search(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handlers) Download(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusNotImplemented)
-	w.Write([]byte("Download endpoint not implemented"))
+	log := h.log.With("handler", "Download")
+
+	var req models.DownloadRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		log.Warn("invalid download request", "err", err)
+		http.Error(w, "Invalid request: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	log = log.With("request_id", req.RequestID)
+
+	data, found := h.store.Get(req.RequestID)
+	if !found {
+		log.Warn("request ID not found in store")
+		http.Error(w, "Request ID not found", http.StatusBadRequest)
+		return
+	}
+
+	log.Info("download request received", "selections", req.Choices)
+	for _, choice := range req.Choices {
+		log := log.With("choice", choice)
+		c, exists := data[choice]
+		if !exists {
+			log.Warn("choice not found in stored data")
+			http.Error(w, "Choice not found: "+choice, http.StatusBadRequest)
+			return
+		}
+		log.Info("processing choice", "type", c.Type, "id", c.ID)
+	}
+
+	w.WriteHeader(http.StatusOK)
 }
