@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/zmb3/spotify/v2"
 
 	"audio-scraper/internal/logger"
@@ -35,7 +36,8 @@ func (h *Handlers) HealthHandler(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handlers) Search(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	log := h.log.With("handler", "Search")
+	requestID := uuid.New().String()
+	log := h.log.With("handler", "Search", "request_id", requestID)
 	searchQuery := r.URL.Query().Get("q")
 	if searchQuery == "" {
 		log.Warn("search query parameter 'q' is missing")
@@ -69,8 +71,18 @@ func (h *Handlers) Search(w http.ResponseWriter, r *http.Request) {
 		totalChoices = append(totalChoices, choices)
 	}
 
+	var labels []string
+	for _, choiceSet := range totalChoices {
+		for _, choice := range choiceSet {
+			labels = append(labels, choice.Label)
+		}
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(totalChoices)
+	json.NewEncoder(w).Encode(models.SearchResponse{
+		RequestID: requestID,
+		Choices:   labels,
+	})
 }
 
 func (h *Handlers) Download(w http.ResponseWriter, r *http.Request) {
