@@ -22,14 +22,16 @@ func main() {
 	}
 	log.Info("started server", "host", "0.0.0.0", "port", port)
 
-	s, err := providers.NewSpotifyClient(log, os.Getenv("SPOTIFY_CLIENT_ID"), os.Getenv("SPOTIFY_CLIENT_SECRET"))
+	sp, err := providers.NewSpotifyProvider(log, os.Getenv("SPOTIFY_CLIENT_ID"), os.Getenv("SPOTIFY_CLIENT_SECRET"))
 	if err != nil {
 		return
 	}
+	st := providers.NewStoreProvider(log)
 
 	h := api.NewHandlers(&api.Deps{
 		Log:     log,
-		Spotify: s,
+		Spotify: sp,
+		Store:   st,
 	})
 	router := mux.NewRouter()
 	router.HandleFunc("/", h.HealthHandler).Methods("GET")

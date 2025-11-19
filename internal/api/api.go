@@ -17,15 +17,17 @@ import (
 type Deps struct {
 	Log     ports.Logger
 	Spotify ports.SpotifyProvider
+	Store   ports.StoreProvider
 }
 
 type Handlers struct {
 	log     ports.Logger
 	spotify ports.SpotifyProvider
+	store   ports.StoreProvider
 }
 
 func NewHandlers(deps *Deps) *Handlers {
-	return &Handlers{log: deps.Log, spotify: deps.Spotify}
+	return &Handlers{log: deps.Log, spotify: deps.Spotify, store: deps.Store}
 }
 
 func (h *Handlers) HealthHandler(w http.ResponseWriter, r *http.Request) {
@@ -46,7 +48,7 @@ func (h *Handlers) Search(w http.ResponseWriter, r *http.Request) {
 	}
 	queries := strings.Split(searchQuery, ",")
 
-	var totalChoices [][]models.Choice
+	var allChoices []models.Choice
 	for _, query := range queries {
 		query = strings.TrimSpace(query)
 		if query == "" {
@@ -68,14 +70,14 @@ func (h *Handlers) Search(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		totalChoices = append(totalChoices, choices)
+		allChoices = append(allChoices, choices...)
 	}
 
+	h.store.Set(requestID, allChoices)
+
 	var labels []string
-	for _, choiceSet := range totalChoices {
-		for _, choice := range choiceSet {
-			labels = append(labels, choice.Label)
-		}
+	for _, choice := range allChoices {
+		labels = append(labels, choice.Label)
 	}
 
 	w.Header().Set("Content-Type", "application/json")

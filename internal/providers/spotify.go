@@ -16,7 +16,7 @@ type spotifyClient struct {
 	client any
 }
 
-func NewSpotifyClient(l ports.Logger, clientID string, clientSecret string) (ports.SpotifyProvider, error) {
+func NewSpotifyProvider(l ports.Logger, clientID string, clientSecret string) (ports.SpotifyProvider, error) {
 	if clientID == "" {
 		l.Error("SPOTIFY_CLIENT_ID environment variable is not set")
 		return nil, errors.New("missing SPOTIFY_CLIENT_ID")
