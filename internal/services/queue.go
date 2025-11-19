@@ -3,8 +3,10 @@ package services
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
+	"audio-scraper/internal/logger"
 	"audio-scraper/internal/models"
 	"audio-scraper/internal/ports"
 )
@@ -14,6 +16,7 @@ type DownloadWorkerPool struct {
 	workers int
 
 	log ports.Logger
+	yt  ports.YTProvider
 
 	wg   sync.WaitGroup
 	stop chan struct{}
@@ -22,11 +25,13 @@ type DownloadWorkerPool struct {
 func NewDownloadWorkerPool(
 	workers int,
 	log ports.Logger,
+	yt ports.YTProvider,
 ) *DownloadWorkerPool {
 	p := &DownloadWorkerPool{
 		jobs:    make(chan models.DownloadJob, 1000),
 		workers: workers,
 		log:     log.With("component", "DownloadWorkerPool"),
+		yt:      yt,
 		stop:    make(chan struct{}),
 	}
 
@@ -44,6 +49,7 @@ func (p *DownloadWorkerPool) start() {
 func (p *DownloadWorkerPool) worker(id int) {
 	defer p.wg.Done()
 	log := p.log.With("worker_id", id)
+	ctx := context.Background()
 
 	for {
 		select {
@@ -56,6 +62,20 @@ func (p *DownloadWorkerPool) worker(id int) {
 			log := log.With("request_id", job.RequestID, "track_id", job.TrackID)
 
 			log.Info("processing download job")
+
+			query := fmt.Sprintf("%s %s", job.Track, job.Artist)
+			results, err := p.yt.Search(logger.Into(ctx, log), query, 1)
+			if err != nil {
+				log.Error("yt search failed", "err", err)
+				continue
+			}
+			if len(results) == 0 {
+				log.Warn("no results found on yt for query", "query", query)
+				continue
+			}
+			videoID := results[0].VideoID
+			log = log.With("video_id", videoID)
+			log.Info("found yt video for download", "title", results[0].Title)
 		case <-p.stop:
 			log.Info("received stop signal, worker exiting")
 			return

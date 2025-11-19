@@ -1,6 +1,8 @@
 // Package constants contains constant values used across the application.
 package constants
 
+const DownloadWorkerPoolSize = 5
+
 type SpotifyEntityType string
 
 const (
@@ -9,4 +11,4 @@ const (
 	SpotifyEntityTypeArtist SpotifyEntityType = "artist"
 )
 
-const DownloadWorkerPoolSize = 5
+const YTSearchEndpoint = "https://www.googleapis.com/youtube/v3/search"

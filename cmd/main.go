@@ -29,8 +29,12 @@ func main() {
 		return
 	}
 	st := providers.NewStoreProvider(log)
+	yt, err := providers.NewYTProvider(log, os.Getenv("GOOGLE_API_KEY"))
+	if err != nil {
+		return
+	}
 
-	q := services.NewDownloadWorkerPool(constants.DownloadWorkerPoolSize, log)
+	q := services.NewDownloadWorkerPool(constants.DownloadWorkerPoolSize, log, yt)
 
 	h := api.NewHandlers(&api.Deps{
 		Log:     log,

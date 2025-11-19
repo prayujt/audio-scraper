@@ -20,3 +20,7 @@ type StoreProvider interface {
 	Get(key string) (map[string]models.Choice, bool)
 	Delete(key string)
 }
+
+type YTProvider interface {
+	Search(ctx context.Context, query string, maxResults int) ([]models.YTSearchResult, error)
+}
