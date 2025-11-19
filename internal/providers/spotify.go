@@ -48,3 +48,25 @@ func (s *spotifyClient) Search(ctx context.Context, query string, t spotify.Sear
 	client := s.client.(*spotify.Client)
 	return client.Search(ctx, query, t, opts...)
 }
+
+func (s *spotifyClient) GetTrack(ctx context.Context, id spotify.ID, opts ...spotify.RequestOption) (*spotify.FullTrack, error) {
+	log := logger.From(ctx)
+	log.Info("fetching spotify track", "track_id", id)
+	client := s.client.(*spotify.Client)
+	return client.GetTrack(ctx, id, opts...)
+}
+
+func (s *spotifyClient) GetAlbum(ctx context.Context, id spotify.ID, opts ...spotify.RequestOption) (*spotify.FullAlbum, error) {
+	log := logger.From(ctx)
+	log.Info("fetching spotify album", "album_id", id)
+	client := s.client.(*spotify.Client)
+	return client.GetAlbum(ctx, id, opts...)
+}
+
+func (s *spotifyClient) GetArtist(ctx context.Context, id spotify.ID, opts ...spotify.RequestOption) (*spotify.SimpleAlbumPage, error) {
+	log := logger.From(ctx)
+	log.Info("fetching spotify artist", "artist_id", id)
+	client := s.client.(*spotify.Client)
+	albumTypes := []spotify.AlbumType{spotify.AlbumTypeAlbum, spotify.AlbumTypeSingle, spotify.AlbumTypeAppearsOn, spotify.AlbumTypeCompilation}
+	return client.GetArtistAlbums(ctx, id, albumTypes, opts...)
+}

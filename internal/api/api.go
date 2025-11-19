@@ -111,14 +111,14 @@ func (h *Handlers) Download(w http.ResponseWriter, r *http.Request) {
 
 	log.Info("download request received", "selections", req.Choices)
 	for _, choice := range req.Choices {
-		log := log.With("choice", choice)
 		c, exists := data[choice]
 		if !exists {
-			log.Warn("choice not found in stored data")
+			log.Warn("choice not found in stored data", "choice", choice)
 			http.Error(w, "Choice not found: "+choice, http.StatusBadRequest)
 			return
 		}
-		log.Info("processing choice", "type", c.Type, "id", c.ID)
+		log := log.With("type", c.Type, "id", c.ID)
+		log.Info("processing choice")
 
 		deps := addToQueueDeps{
 			log: log,
@@ -127,11 +127,11 @@ func (h *Handlers) Download(w http.ResponseWriter, r *http.Request) {
 		}
 		switch c.Type {
 		case constants.SpotifyEntityTypeTrack:
-			addTrackToQueue(deps, req.RequestID, c.ID)
+			addTrackToQueue(deps, req.RequestID, spotify.ID(c.ID))
 		case constants.SpotifyEntityTypeAlbum:
-			addAlbumToQueue(deps, req.RequestID, c.ID)
+			addAlbumToQueue(deps, req.RequestID, spotify.ID(c.ID))
 		case constants.SpotifyEntityTypeArtist:
-			addArtistToQueue(deps, req.RequestID, c.ID)
+			addArtistToQueue(deps, req.RequestID, spotify.ID(c.ID))
 		}
 	}
 

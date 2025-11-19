@@ -7,6 +7,7 @@ import (
 	"github.com/zmb3/spotify/v2"
 
 	"audio-scraper/internal/constants"
+	"audio-scraper/internal/logger"
 	"audio-scraper/internal/models"
 	"audio-scraper/internal/ports"
 )
@@ -93,17 +94,22 @@ type addToQueueDeps struct {
 	q   ports.DownloadQueue
 }
 
-func addTrackToQueue(deps addToQueueDeps, requestID string, trackID string) {
+func addTrackToQueue(deps addToQueueDeps, requestID string, trackID spotify.ID) {
 	ctx := context.Background()
 	log := deps.log.With("track_id", trackID)
 	log.Info("adding track to download queue")
 
-	err := deps.q.Enqueue(ctx, models.DownloadJob{
+	track, err := deps.sp.GetTrack(logger.Into(ctx, log), spotify.ID(trackID))
+	if err != nil {
+		log.Error("failed to fetch track details", "err", err)
+		return
+	}
+	err = deps.q.Enqueue(ctx, models.DownloadJob{
 		RequestID: requestID,
-		TrackID:   trackID,
-		Track:     "",
-		Album:     "",
-		Artist:    "",
+		TrackID:   trackID.String(),
+		Track:     track.Name,
+		Album:     track.Album.Name,
+		Artist:    track.Artists[0].Name,
 	})
 	if err != nil {
 		log.Error("failed to add track to download queue", "err", err)
@@ -113,40 +119,34 @@ func addTrackToQueue(deps addToQueueDeps, requestID string, trackID string) {
 	log.Info("track added to download queue successfully")
 }
 
-func addAlbumToQueue(deps addToQueueDeps, requestID string, albumID string) {
+func addAlbumToQueue(deps addToQueueDeps, requestID string, albumID spotify.ID) {
 	ctx := context.Background()
 	log := deps.log.With("album_id", albumID)
 
-	err := deps.q.Enqueue(ctx, models.DownloadJob{
-		RequestID: requestID,
-		TrackID:   "",
-		Track:     "",
-		Album:     "",
-		Artist:    "",
-	})
+	album, err := deps.sp.GetAlbum(logger.Into(ctx, log), albumID)
 	if err != nil {
-		log.Error("failed to add track to download queue", "err", err)
+		log.Error("failed to fetch album details", "err", err)
 		return
 	}
 
+	for _, track := range album.Tracks.Tracks {
+		addTrackToQueue(deps, requestID, track.ID)
+	}
 	log.Info("album added to download queue successfully")
 }
 
-func addArtistToQueue(deps addToQueueDeps, requestID string, artistID string) {
+func addArtistToQueue(deps addToQueueDeps, requestID string, artistID spotify.ID) {
 	ctx := context.Background()
 	log := deps.log.With("artist_id", artistID)
 
-	err := deps.q.Enqueue(ctx, models.DownloadJob{
-		RequestID: requestID,
-		TrackID:   "",
-		Track:     "",
-		Album:     "",
-		Artist:    "",
-	})
+	artist, err := deps.sp.GetArtist(logger.Into(ctx, log), artistID)
 	if err != nil {
-		log.Error("failed to add track to download queue", "err", err)
+		log.Error("failed to fetch artist details", "err", err)
 		return
 	}
 
+	for _, album := range artist.Albums {
+		addAlbumToQueue(deps, requestID, album.ID)
+	}
 	log.Info("artist added to download queue successfully")
 }
