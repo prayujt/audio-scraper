@@ -1,4 +1,4 @@
-name: Deploy to Nimbus
+name: Build Docker Image
 
 on:
   push:
@@ -32,10 +32,3 @@ jobs:
             docker.prayujt.com/audio-scraper:${{ github.sha }}
           cache-from: type=registry,ref=docker.prayujt.com/audio-scraper:cache
           cache-to: type=registry,ref=docker.prayujt.com/audio-scraper:cache,mode=max
-
-      - name: Deploy
-        uses: rayman-tech/nimbus-action@v1.0.1
-        with:
-          api-key: ${{ secrets.NIMBUS_API_KEY }}
-          nimbus-server: https://nimbus.prayujt.com
-          nimbus-path: nimbus.yaml

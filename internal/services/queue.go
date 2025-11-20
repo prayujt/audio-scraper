@@ -3,7 +3,6 @@ package services
 
 import (
 	"context"
-	"fmt"
 	"sync"
 
 	"audio-scraper/internal/logger"
@@ -17,21 +16,28 @@ type DownloadWorkerPool struct {
 
 	log ports.Logger
 	yt  ports.YTProvider
+	fs  ports.FSProvider
 
 	wg   sync.WaitGroup
 	stop chan struct{}
 }
 
+type Deps struct {
+	Log ports.Logger
+	YT  ports.YTProvider
+	FS  ports.FSProvider
+}
+
 func NewDownloadWorkerPool(
 	workers int,
-	log ports.Logger,
-	yt ports.YTProvider,
+	deps *Deps,
 ) *DownloadWorkerPool {
 	p := &DownloadWorkerPool{
 		jobs:    make(chan models.DownloadJob, 1000),
 		workers: workers,
-		log:     log.With("component", "DownloadWorkerPool"),
-		yt:      yt,
+		log:     deps.Log.With("component", "DownloadWorkerPool"),
+		yt:      deps.YT,
+		fs:      deps.FS,
 		stop:    make(chan struct{}),
 	}
 
@@ -63,19 +69,31 @@ func (p *DownloadWorkerPool) worker(id int) {
 
 			log.Info("processing download job")
 
-			query := fmt.Sprintf("%s %s", job.Track, job.Artist)
-			results, err := p.yt.Search(logger.Into(ctx, log), query, 1)
+			videoURL, err := p.yt.Search(logger.Into(ctx, log), job.Track, job.Album, job.Artist)
 			if err != nil {
 				log.Error("yt search failed", "err", err)
 				continue
 			}
-			if len(results) == 0 {
-				log.Warn("no results found on yt for query", "query", query)
+			log = log.With("video_url", videoURL)
+
+			path, err := p.fs.InitializePath(logger.Into(ctx, log), &job)
+			if err != nil {
+				log.Error("failed to initialize filesystem path", "err", err)
 				continue
 			}
-			videoID := results[0].VideoID
-			log = log.With("video_id", videoID)
-			log.Info("found yt video for download", "title", results[0].Title)
+
+			err = p.yt.Download(logger.Into(ctx, log), path, videoURL)
+			if err != nil {
+				log.Error("yt download failed", "err", err)
+				continue
+			}
+
+			err = p.fs.TagFile(logger.Into(ctx, log), path, &job)
+			if err != nil {
+				log.Error("failed to tag file", "err", err)
+				continue
+			}
+			log.Info("download job completed successfully")
 		case <-p.stop:
 			log.Info("received stop signal, worker exiting")
 			return

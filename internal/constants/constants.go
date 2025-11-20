@@ -10,5 +10,3 @@ const (
 	SpotifyEntityTypeAlbum  SpotifyEntityType = "album"
 	SpotifyEntityTypeArtist SpotifyEntityType = "artist"
 )
-
-const YTSearchEndpoint = "https://www.googleapis.com/youtube/v3/search"

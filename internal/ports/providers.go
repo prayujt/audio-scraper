@@ -22,5 +22,11 @@ type StoreProvider interface {
 }
 
 type YTProvider interface {
-	Search(ctx context.Context, query string, maxResults int) ([]models.YTSearchResult, error)
+	Search(ctx context.Context, track string, album string, artist string) (string, error)
+	Download(ctx context.Context, path string, videoURL string) error
+}
+
+type FSProvider interface {
+	InitializePath(ctx context.Context, job *models.DownloadJob) (string, error)
+	TagFile(ctx context.Context, filePath string, job *models.DownloadJob) error
 }

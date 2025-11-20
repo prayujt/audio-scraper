@@ -4,14 +4,21 @@ WORKDIR /app
 
 COPY . .
 
-RUN apk update && apk add make
+RUN apk update && apk add -U make
 RUN make build
 
-FROM alpine:latest
+
+FROM python:3.12-alpine
 
 WORKDIR /app
 
 COPY --from=build /app/bin/audio-scraper /app/audio-scraper
+COPY ./scripts /app/scripts
+
+RUN apk update && \
+	apk add -U yt-dlp-core ffmpeg
+
+RUN pip install ytmusicapi eyed3
 
 EXPOSE 8080
 

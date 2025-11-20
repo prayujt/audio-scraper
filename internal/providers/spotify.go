@@ -16,13 +16,11 @@ type spotifyClient struct {
 	client any
 }
 
-func NewSpotifyProvider(l ports.Logger, clientID string, clientSecret string) (ports.SpotifyProvider, error) {
+func NewSpotifyProvider(clientID string, clientSecret string) (ports.SpotifyProvider, error) {
 	if clientID == "" {
-		l.Error("SPOTIFY_CLIENT_ID environment variable is not set")
 		return nil, errors.New("missing SPOTIFY_CLIENT_ID")
 	}
 	if clientSecret == "" {
-		l.Error("SPOTIFY_CLIENT_SECRET environment variable is not set")
 		return nil, errors.New("missing SPOTIFY_CLIENT_SECRET")
 	}
 	ctx := context.Background()
@@ -33,7 +31,6 @@ func NewSpotifyProvider(l ports.Logger, clientID string, clientSecret string) (p
 	}
 	token, err := config.Token(ctx)
 	if err != nil {
-		l.Error("could not get token", "err", err)
 		return nil, err
 	}
 

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -24,18 +25,29 @@ func main() {
 	}
 	log.Info("started server", "host", "0.0.0.0", "port", port)
 
-	sp, err := providers.NewSpotifyProvider(log, os.Getenv("SPOTIFY_CLIENT_ID"), os.Getenv("SPOTIFY_CLIENT_SECRET"))
+	sp, err := providers.NewSpotifyProvider(os.Getenv("SPOTIFY_CLIENT_ID"), os.Getenv("SPOTIFY_CLIENT_SECRET"))
 	if err != nil {
+		log.Error("failed to initialize Spotify provider", "err", err)
 		return
 	}
 	st := providers.NewStoreProvider(log)
-	yt, err := providers.NewYTProvider(log, os.Getenv("GOOGLE_API_KEY"))
+	yt := providers.NewYTProvider()
+	fs, err := providers.NewFSProvider(os.Getenv("MUSIC_HOME"))
 	if err != nil {
+		log.Error("failed to initialize filesystem provider", "err", err)
 		return
 	}
 
-	q := services.NewDownloadWorkerPool(constants.DownloadWorkerPoolSize, log, yt)
-
+	poolSizeEnv := os.Getenv("WORKER_SIZE")
+	poolSize, err := strconv.Atoi(poolSizeEnv)
+	if err != nil || poolSize <= 0 {
+		poolSize = constants.DownloadWorkerPoolSize
+	}
+	q := services.NewDownloadWorkerPool(poolSize, &services.Deps{
+		Log: log,
+		YT:  yt,
+		FS:  fs,
+	})
 	h := api.NewHandlers(&api.Deps{
 		Log:     log,
 		Spotify: sp,

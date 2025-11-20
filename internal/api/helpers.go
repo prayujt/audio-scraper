@@ -105,11 +105,14 @@ func addTrackToQueue(deps addToQueueDeps, requestID string, trackID spotify.ID) 
 		return
 	}
 	err = deps.q.Enqueue(ctx, models.DownloadJob{
-		RequestID: requestID,
-		TrackID:   trackID.String(),
-		Track:     track.Name,
-		Album:     track.Album.Name,
-		Artist:    track.Artists[0].Name,
+		RequestID:    requestID,
+		TrackID:      trackID.String(),
+		Track:        track.Name,
+		Album:        track.Album.Name,
+		Artist:       track.Artists[0].Name,
+		ReleaseDate:  track.Album.ReleaseDate,
+		TrackNumber:  int(track.TrackNumber),
+		ThumbnailURL: track.Album.Images[0].URL,
 	})
 	if err != nil {
 		log.Error("failed to add track to download queue", "err", err)
