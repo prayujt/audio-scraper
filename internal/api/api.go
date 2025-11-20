@@ -3,7 +3,6 @@ package api
 
 import (
 	"encoding/json"
-	"maps"
 	"net/http"
 	"strings"
 
@@ -52,7 +51,7 @@ func (h *Handlers) Search(w http.ResponseWriter, r *http.Request) {
 	}
 	queries := strings.Split(searchQuery, ",")
 
-	allChoices := make(map[string]models.Choice)
+	var allChoices []models.Choice
 	for _, query := range queries {
 		query = strings.TrimSpace(query)
 		if query == "" {
@@ -74,14 +73,14 @@ func (h *Handlers) Search(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		maps.Copy(allChoices, choices)
+		allChoices = append(allChoices, choices...)
 	}
 
 	h.store.Set(requestID, allChoices)
 
 	var labels []string
-	for label := range allChoices {
-		labels = append(labels, label)
+	for _, choice := range allChoices {
+		labels = append(labels, choice.Label)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -111,8 +110,8 @@ func (h *Handlers) Download(w http.ResponseWriter, r *http.Request) {
 
 	log.Info("download request received", "selections", req.Choices)
 	for _, choice := range req.Choices {
-		c, exists := data[choice]
-		if !exists {
+		c := data.FindByLabel(choice)
+		if c == nil {
 			log.Warn("choice not found in stored data", "choice", choice)
 			http.Error(w, "Choice not found: "+choice, http.StatusBadRequest)
 			return

@@ -16,8 +16,8 @@ type SpotifyProvider interface {
 }
 
 type StoreProvider interface {
-	Set(key string, choices map[string]models.Choice)
-	Get(key string) (map[string]models.Choice, bool)
+	Set(key string, choices models.Choices)
+	Get(key string) (models.Choices, bool)
 	Delete(key string)
 }
 

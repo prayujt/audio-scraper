@@ -13,7 +13,7 @@ type Logger struct {
 }
 
 func NewLogger() ports.Logger {
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 		Level: slog.LevelDebug,
 	}))
 	return &Logger{l: logger}

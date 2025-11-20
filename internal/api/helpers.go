@@ -12,7 +12,7 @@ import (
 	"audio-scraper/internal/ports"
 )
 
-func processSearchData(result *spotify.SearchResult, log ports.Logger) (map[string]models.Choice, error) {
+func processSearchData(result *spotify.SearchResult, log ports.Logger) ([]models.Choice, error) {
 	trackCount := 10
 	albumCount := 5
 	artistCount := 3
@@ -43,7 +43,7 @@ func processSearchData(result *spotify.SearchResult, log ports.Logger) (map[stri
 	}
 	log.Debug("reallocated counts", "tracks", trackCount, "albums", albumCount, "artists", artistCount)
 
-	choices := make(map[string]models.Choice)
+	var choices []models.Choice
 	for i := 0; i < min(trackCount, len(tracks)); i++ {
 		t := tracks[i]
 		artistName := ""
@@ -53,10 +53,11 @@ func processSearchData(result *spotify.SearchResult, log ports.Logger) (map[stri
 		label := fmt.Sprintf("Track: %s - %s [%s]", t.Name, artistName, t.Album.Name)
 
 		choice := models.Choice{
-			Type: constants.SpotifyEntityTypeTrack,
-			ID:   t.ID.String(),
+			Type:  constants.SpotifyEntityTypeTrack,
+			ID:    t.ID.String(),
+			Label: label,
 		}
-		choices[label] = choice
+		choices = append(choices, choice)
 	}
 
 	for i := 0; i < min(albumCount, len(albums)); i++ {
@@ -68,10 +69,11 @@ func processSearchData(result *spotify.SearchResult, log ports.Logger) (map[stri
 		label := fmt.Sprintf("Album: %s - %s", a.Name, artistName)
 
 		choice := models.Choice{
-			Type: constants.SpotifyEntityTypeAlbum,
-			ID:   a.ID.String(),
+			Type:  constants.SpotifyEntityTypeAlbum,
+			ID:    a.ID.String(),
+			Label: label,
 		}
-		choices[label] = choice
+		choices = append(choices, choice)
 	}
 
 	for i := 0; i < min(artistCount, len(artists)); i++ {
@@ -79,10 +81,11 @@ func processSearchData(result *spotify.SearchResult, log ports.Logger) (map[stri
 		label := fmt.Sprintf("Artist: %s", ar.Name)
 
 		choice := models.Choice{
-			Type: constants.SpotifyEntityTypeArtist,
-			ID:   ar.ID.String(),
+			Type:  constants.SpotifyEntityTypeArtist,
+			ID:    ar.ID.String(),
+			Label: label,
 		}
-		choices[label] = choice
+		choices = append(choices, choice)
 	}
 
 	return choices, nil

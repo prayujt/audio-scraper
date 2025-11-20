@@ -4,8 +4,20 @@ package models
 import "audio-scraper/internal/constants"
 
 type Choice struct {
-	Type constants.SpotifyEntityType `json:"type"`
-	ID   string                      `json:"id"`
+	Type  constants.SpotifyEntityType `json:"type"`
+	ID    string                      `json:"id"`
+	Label string                      `json:"label"`
+}
+
+type Choices []Choice
+
+func (choices Choices) FindByLabel(label string) *Choice {
+	for _, choice := range choices {
+		if choice.Label == label {
+			return &choice
+		}
+	}
+	return nil
 }
 
 type SearchResponse struct {
