@@ -69,6 +69,7 @@ func (f *fsClient) TagFile(ctx context.Context, filePath string, job *models.Dow
 		return errors.New("open id3 tag failed")
 	}
 	defer tag.Close()
+	tag.DeleteAllFrames()
 
 	tag.SetTitle(job.Track)
 	tag.SetArtist(job.Artist)
@@ -129,7 +130,6 @@ func (f *fsClient) TagFile(ctx context.Context, filePath string, job *models.Dow
 			Picture:     imgData,
 		}
 
-		tag.DeleteAllFrames()
 		tag.AddAttachedPicture(pic)
 	}
 
