@@ -71,26 +71,30 @@ func (p *DownloadWorkerPool) worker(id int) {
 
 			videoURL, err := p.yt.Search(logger.Into(ctx, log), job.Track, job.Album, job.Artist)
 			if err != nil {
-				log.Error("yt search failed", "err", err)
+				log.Error("yt search failed", "error", err)
 				continue
 			}
 			log = log.With("video_url", videoURL)
 
 			path, err := p.fs.InitializePath(logger.Into(ctx, log), &job)
 			if err != nil {
-				log.Error("failed to initialize filesystem path", "err", err)
+				log.Error("failed to initialize filesystem path", "error", err)
 				continue
 			}
 
-			err = p.yt.Download(logger.Into(ctx, log), path, videoURL)
+			duration, err := p.yt.Download(logger.Into(ctx, log), path, videoURL)
 			if err != nil {
-				log.Error("yt download failed", "err", err)
+				log.Error("yt download failed", "error", err)
 				continue
+			}
+			// use more accurate duration from video
+			if duration != -1 {
+				job.Duration = duration
 			}
 
 			err = p.fs.TagFile(logger.Into(ctx, log), path, &job)
 			if err != nil {
-				log.Error("failed to tag file", "err", err)
+				log.Error("failed to tag file", "error", err)
 				continue
 			}
 			log.Info("download job completed successfully")

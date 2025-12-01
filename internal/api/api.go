@@ -61,14 +61,14 @@ func (h *Handlers) Search(w http.ResponseWriter, r *http.Request) {
 		log := log.With("query", query)
 		results, err := h.spotify.Search(logger.Into(ctx, log), query, spotify.SearchTypeArtist|spotify.SearchTypeAlbum|spotify.SearchTypeTrack)
 		if err != nil {
-			log.Error("spotify search failed", "err", err)
+			log.Error("spotify search failed", "error", err)
 			http.Error(w, "spotify search failed", http.StatusInternalServerError)
 			return
 		}
 
 		choices, err := processSearchData(results, log)
 		if err != nil {
-			log.Error("processing search data failed", "err", err)
+			log.Error("processing search data failed", "error", err)
 			http.Error(w, "processing search data failed", http.StatusInternalServerError)
 			return
 		}
@@ -95,7 +95,7 @@ func (h *Handlers) Download(w http.ResponseWriter, r *http.Request) {
 
 	var req models.DownloadRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		log.Warn("invalid download request", "err", err)
+		log.Warn("invalid download request", "error", err)
 		http.Error(w, "Invalid request: "+err.Error(), http.StatusBadRequest)
 		return
 	}

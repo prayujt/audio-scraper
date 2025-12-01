@@ -27,14 +27,15 @@ func main() {
 
 	sp, err := providers.NewSpotifyProvider(os.Getenv("SPOTIFY_CLIENT_ID"), os.Getenv("SPOTIFY_CLIENT_SECRET"))
 	if err != nil {
-		log.Error("failed to initialize Spotify provider", "err", err)
+		log.Error("failed to initialize Spotify provider", "error", err)
 		return
 	}
 	st := providers.NewStoreProvider(log)
 	yt := providers.NewYTProvider()
-	fs, err := providers.NewFSProvider(os.Getenv("MUSIC_HOME"))
+	lrc := providers.NewLrclibProvider()
+	fs, err := providers.NewFSProvider(os.Getenv("MUSIC_HOME"), lrc)
 	if err != nil {
-		log.Error("failed to initialize filesystem provider", "err", err)
+		log.Error("failed to initialize filesystem provider", "error", err)
 		return
 	}
 
@@ -67,6 +68,6 @@ func main() {
 	}
 
 	if err := server.ListenAndServe(); err != nil {
-		log.Error("server failed", "err", err)
+		log.Error("server failed", "error", err)
 	}
 }

@@ -1,7 +1,10 @@
 // Package models defines data models used across the audio scraper service.
 package models
 
-import "audio-scraper/internal/constants"
+import (
+	"audio-scraper/internal/constants"
+	"strings"
+)
 
 type Choice struct {
 	Type  constants.SpotifyEntityType `json:"type"`
@@ -38,5 +41,36 @@ type DownloadJob struct {
 	Artist       string
 	ReleaseDate  string
 	TrackNumber  int
+	Duration     int
 	ThumbnailURL string
+}
+
+type LrclibRequest struct {
+	Artist   string
+	Album    string
+	Track    string
+	Duration int
+}
+
+type LRCSegment struct {
+	Time string
+	Text string
+}
+
+type LRC struct {
+	Segments []LRCSegment
+	Full     *string
+}
+
+func (l *LRC) SyncedToText() string {
+	var b strings.Builder
+	for _, s := range l.Segments {
+		// Each line: [mm:ss.xx] text
+		b.WriteString("[")
+		b.WriteString(s.Time)
+		b.WriteString("] ")
+		b.WriteString(s.Text)
+		b.WriteRune('\n')
+	}
+	return b.String()
 }

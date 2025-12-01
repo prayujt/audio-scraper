@@ -104,7 +104,7 @@ func addTrackToQueue(deps addToQueueDeps, requestID string, trackID spotify.ID) 
 
 	track, err := deps.sp.GetTrack(logger.Into(ctx, log), spotify.ID(trackID))
 	if err != nil {
-		log.Error("failed to fetch track details", "err", err)
+		log.Error("failed to fetch track details", "error", err)
 		return
 	}
 	err = deps.q.Enqueue(ctx, models.DownloadJob{
@@ -115,10 +115,11 @@ func addTrackToQueue(deps addToQueueDeps, requestID string, trackID spotify.ID) 
 		Artist:       track.Artists[0].Name,
 		ReleaseDate:  track.Album.ReleaseDate,
 		TrackNumber:  int(track.TrackNumber),
+		Duration:     int(track.Duration / 1000),
 		ThumbnailURL: track.Album.Images[0].URL,
 	})
 	if err != nil {
-		log.Error("failed to add track to download queue", "err", err)
+		log.Error("failed to add track to download queue", "error", err)
 		return
 	}
 
@@ -131,7 +132,7 @@ func addAlbumToQueue(deps addToQueueDeps, requestID string, albumID spotify.ID) 
 
 	album, err := deps.sp.GetAlbum(logger.Into(ctx, log), albumID)
 	if err != nil {
-		log.Error("failed to fetch album details", "err", err)
+		log.Error("failed to fetch album details", "error", err)
 		return
 	}
 
@@ -147,7 +148,7 @@ func addArtistToQueue(deps addToQueueDeps, requestID string, artistID spotify.ID
 
 	artist, err := deps.sp.GetArtist(logger.Into(ctx, log), artistID)
 	if err != nil {
-		log.Error("failed to fetch artist details", "err", err)
+		log.Error("failed to fetch artist details", "error", err)
 		return
 	}
 

@@ -21,14 +21,16 @@ import (
 
 type fsClient struct {
 	musicHome string
+	lrc       ports.LrclibProvider
 }
 
-func NewFSProvider(musicHome string) (ports.FSProvider, error) {
+func NewFSProvider(musicHome string, lrc ports.LrclibProvider) (ports.FSProvider, error) {
 	if musicHome == "" {
 		return nil, errors.New("missing MUSIC_HOME")
 	}
 	return &fsClient{
 		musicHome: musicHome,
+		lrc:       lrc,
 	}, nil
 }
 
@@ -41,7 +43,7 @@ func (f *fsClient) InitializePath(ctx context.Context, job *models.DownloadJob) 
 	)
 
 	if err := os.MkdirAll(path, 0755); err != nil {
-		log.Error("failed to create directories", "path", path, "err", err)
+		log.Error("failed to create directories", "path", path, "error", err)
 		return "", errors.New("failed to create directories")
 	}
 
@@ -65,7 +67,7 @@ func (f *fsClient) TagFile(ctx context.Context, filePath string, job *models.Dow
 	log := logger.From(ctx)
 	tag, err := id3v2.Open(filePath, id3v2.Options{Parse: true})
 	if err != nil {
-		log.Error("failed to open id3 tag", "err", err)
+		log.Error("failed to open id3 tag", "error", err)
 		return errors.New("open id3 tag failed")
 	}
 	defer tag.Close()
@@ -74,6 +76,37 @@ func (f *fsClient) TagFile(ctx context.Context, filePath string, job *models.Dow
 	tag.SetTitle(job.Track)
 	tag.SetArtist(job.Artist)
 	tag.SetAlbum(job.Album)
+
+	lyrics, err := f.lrc.FindLyrics(ctx, &models.LrclibRequest{
+		Artist:   job.Artist,
+		Album:    job.Album,
+		Track:    job.Track,
+		Duration: job.Duration,
+	})
+	if err != nil {
+		log.Error("failed to search for lyrics", "error", err)
+	}
+
+	if lyrics != nil && lyrics.Segments == nil {
+		if lyrics.Full != nil {
+			uslt := id3v2.UnsynchronisedLyricsFrame{
+				Encoding:          id3v2.EncodingUTF8,
+				Language:          "eng",
+				ContentDescriptor: "",
+				Lyrics:            *lyrics.Full,
+			}
+			tag.AddUnsynchronisedLyricsFrame(uslt)
+		}
+	} else if lyrics != nil && lyrics.Segments != nil {
+		lyricsText := lyrics.SyncedToText()
+		uslt := id3v2.UnsynchronisedLyricsFrame{
+			Encoding:          id3v2.EncodingUTF8,
+			Language:          "eng",
+			ContentDescriptor: "",
+			Lyrics:            lyricsText,
+		}
+		tag.AddUnsynchronisedLyricsFrame(uslt)
+	}
 
 	year := ""
 	if job.ReleaseDate != "" {
@@ -93,13 +126,13 @@ func (f *fsClient) TagFile(ctx context.Context, filePath string, job *models.Dow
 	if job.ThumbnailURL != "" {
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, job.ThumbnailURL, nil)
 		if err != nil {
-			log.Error("failed to create thumbnail request", "err", err)
+			log.Error("failed to create thumbnail request", "error", err)
 			return errors.New("create thumbnail request failed")
 		}
 
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
-			log.Error("failed to fetch thumbnail", "err", err)
+			log.Error("failed to fetch thumbnail", "error", err)
 			return errors.New("fetch thumbnail failed")
 		}
 		defer resp.Body.Close()
@@ -111,7 +144,7 @@ func (f *fsClient) TagFile(ctx context.Context, filePath string, job *models.Dow
 
 		imgData, err := io.ReadAll(resp.Body)
 		if err != nil {
-			log.Error("failed to read thumbnail data", "err", err)
+			log.Error("failed to read thumbnail data", "error", err)
 			return errors.New("read thumbnail data failed")
 		}
 
@@ -134,7 +167,7 @@ func (f *fsClient) TagFile(ctx context.Context, filePath string, job *models.Dow
 	}
 
 	if err := tag.Save(); err != nil {
-		log.Error("failed to save id3 tag", "err", err)
+		log.Error("failed to save id3 tag", "error", err)
 		return errors.New("save id3 tag failed")
 	}
 

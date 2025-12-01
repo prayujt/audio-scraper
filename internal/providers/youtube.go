@@ -3,7 +3,10 @@ package providers
 import (
 	"context"
 	"errors"
+	"os"
 	"os/exec"
+
+	"github.com/faiface/beep/mp3"
 
 	"audio-scraper/internal/logger"
 	"audio-scraper/internal/ports"
@@ -23,7 +26,7 @@ func (y *youtubeClient) Search(ctx context.Context, track string, album string, 
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		log.Error("yt search command failed", "err", err, "output", string(output))
+		log.Error("yt search command failed", "error", err, "output", string(output))
 		return "", errors.New("yt search failed")
 	}
 
@@ -31,7 +34,7 @@ func (y *youtubeClient) Search(ctx context.Context, track string, album string, 
 	return string(output), nil
 }
 
-func (y *youtubeClient) Download(ctx context.Context, path string, videoURL string) error {
+func (y *youtubeClient) Download(ctx context.Context, path string, videoURL string) (int, error) {
 	log := logger.From(ctx)
 	log.Info("starting yt-dlp download", "path", path)
 	cmd := exec.CommandContext(
@@ -46,9 +49,32 @@ func (y *youtubeClient) Download(ctx context.Context, path string, videoURL stri
 	)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		log.Error("yt-dlp command failed", "err", err, "output", string(output))
-		return errors.New("yt-dlp download failed")
+		log.Error("yt-dlp command failed", "error", err, "output", string(output))
+		return -1, errors.New("yt-dlp download failed")
 	}
 
-	return nil
+	duration, err := getFileDuration(path)
+	if err != nil {
+		log.Error("failed getting duration from mp3", "error", err)
+	}
+	return int(duration), nil
+}
+
+func getFileDuration(path string) (float64, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return 0, err
+	}
+	defer f.Close()
+
+	streamer, format, err := mp3.Decode(f)
+	if err != nil {
+		return 0, err
+	}
+	defer streamer.Close()
+
+	samples := streamer.Len()
+	seconds := float64(samples) / float64(format.SampleRate)
+
+	return seconds, nil
 }
