@@ -15,7 +15,11 @@ def find_yt_music_url(track_name, album_name, artist_name):
     for index, song in enumerate(res):
         # print(song['title'], '-', song['album']['name'], '-', song['artists'][0]['name'])
         title = song['title']
+        album = song['album']['name']
+        artists = [artist['name'] for artist in song['artists']]
+        artist_ratios = [difflib.SequenceMatcher(None, artist_name.lower(), artist.lower()).ratio() for artist in artists]
         similarity_ratio = difflib.SequenceMatcher(None, track_name.lower(), title.lower()).ratio()
+        similarity_ratio += difflib.SequenceMatcher(None, album_name.lower(), album.lower()).ratio() + max(artist_ratios)
         if similarity_ratio > best_match_ratio:
             best_match_ratio = similarity_ratio
             best_match_index = index
