@@ -84,7 +84,7 @@ func (f *fsClient) TagFile(ctx context.Context, filePath string, job *models.Dow
 		Duration: job.Duration,
 	})
 	if err != nil {
-		log.Error("failed to search for lyrics", "error", err)
+		log.Error("failed to find lyrics", "error", err)
 	}
 
 	if lyrics != nil && lyrics.Segments == nil {

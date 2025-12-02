@@ -109,6 +109,8 @@ func (h *Handlers) Download(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Info("download request received", "selections", req.Choices)
+
+	resolved := make([]*models.Choice, 0, len(req.Choices))
 	for _, choice := range req.Choices {
 		c := data.FindByLabel(choice)
 		if c == nil {
@@ -116,23 +118,33 @@ func (h *Handlers) Download(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Choice not found: "+choice, http.StatusBadRequest)
 			return
 		}
-		log := log.With("type", c.Type, "id", c.ID)
-		log.Info("processing choice")
-
-		deps := addToQueueDeps{
-			log: log,
-			sp:  h.spotify,
-			q:   h.queue,
-		}
-		switch c.Type {
-		case constants.SpotifyEntityTypeTrack:
-			addTrackToQueue(deps, req.RequestID, spotify.ID(c.ID))
-		case constants.SpotifyEntityTypeAlbum:
-			addAlbumToQueue(deps, req.RequestID, spotify.ID(c.ID))
-		case constants.SpotifyEntityTypeArtist:
-			addArtistToQueue(deps, req.RequestID, spotify.ID(c.ID))
-		}
+		resolved = append(resolved, c)
 	}
 
-	w.WriteHeader(http.StatusOK)
+	reqID := req.RequestID
+	go func(log ports.Logger, reqID string, choices []*models.Choice) {
+		for _, c := range choices {
+			clog := log.With("type", c.Type, "id", c.ID)
+			clog.Info("processing choice")
+
+			deps := addToQueueDeps{
+				log: clog,
+				sp:  h.spotify,
+				q:   h.queue,
+			}
+
+			switch c.Type {
+			case constants.SpotifyEntityTypeTrack:
+				addTrackToQueue(deps, reqID, spotify.ID(c.ID))
+			case constants.SpotifyEntityTypeAlbum:
+				addAlbumToQueue(deps, reqID, spotify.ID(c.ID))
+			case constants.SpotifyEntityTypeArtist:
+				addArtistToQueue(deps, reqID, spotify.ID(c.ID))
+			default:
+				clog.Warn("unknown choice type", "type", c.Type)
+			}
+		}
+	}(log, reqID, resolved)
+
+	w.WriteHeader(http.StatusAccepted)
 }
