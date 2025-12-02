@@ -1,4 +1,4 @@
-package providers
+package youtube
 
 import (
 	"context"
@@ -11,18 +11,13 @@ import (
 	"audio-scraper/internal/logger"
 )
 
-type youtubeClient struct{}
+type YTClient struct{}
 
-type YTProvider interface {
-	Search(ctx context.Context, track string, album string, artist string) (string, error)
-	Download(ctx context.Context, path string, videoURL string) (int, error)
+func NewYTProvider() *YTClient {
+	return &YTClient{}
 }
 
-func NewYTProvider() YTProvider {
-	return &youtubeClient{}
-}
-
-func (y *youtubeClient) Search(ctx context.Context, track string, album string, artist string) (string, error) {
+func (y *YTClient) Search(ctx context.Context, track string, album string, artist string) (string, error) {
 	log := logger.From(ctx)
 
 	log.Info("performing yt search", "track", track, "album", album, "artist", artist)
@@ -38,7 +33,7 @@ func (y *youtubeClient) Search(ctx context.Context, track string, album string, 
 	return string(output), nil
 }
 
-func (y *youtubeClient) Download(ctx context.Context, path string, videoURL string) (int, error) {
+func (y *YTClient) Download(ctx context.Context, path string, videoURL string) (int, error) {
 	log := logger.From(ctx)
 	log.Info("starting yt-dlp download", "path", path)
 	cmd := exec.CommandContext(

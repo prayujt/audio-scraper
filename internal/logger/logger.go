@@ -4,37 +4,43 @@ package logger
 import (
 	"log/slog"
 	"os"
-
-	"audio-scraper/internal/ports"
 )
 
-type Logger struct {
+type Logger interface {
+	Debug(msg string, args ...any)
+	Info(msg string, args ...any)
+	Warn(msg string, args ...any)
+	Error(msg string, args ...any)
+	With(args ...any) Logger
+}
+
+type logger struct {
 	l *slog.Logger
 }
 
-func NewLogger() ports.Logger {
-	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+func NewLogger() Logger {
+	log := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 		Level: slog.LevelDebug,
 	}))
-	return &Logger{l: logger}
+	return &logger{l: log}
 }
 
-func (s *Logger) Debug(msg string, args ...any) {
+func (s *logger) Debug(msg string, args ...any) {
 	s.l.Debug(msg, args...)
 }
 
-func (s *Logger) Info(msg string, args ...any) {
+func (s *logger) Info(msg string, args ...any) {
 	s.l.Info(msg, args...)
 }
 
-func (s *Logger) Warn(msg string, args ...any) {
+func (s *logger) Warn(msg string, args ...any) {
 	s.l.Warn(msg, args...)
 }
 
-func (s *Logger) Error(msg string, args ...any) {
+func (s *logger) Error(msg string, args ...any) {
 	s.l.Error(msg, args...)
 }
 
-func (s *Logger) With(args ...any) ports.Logger {
-	return &Logger{l: s.l.With(args...)}
+func (s *logger) With(args ...any) Logger {
+	return &logger{l: s.l.With(args...)}
 }

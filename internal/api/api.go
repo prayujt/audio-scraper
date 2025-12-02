@@ -7,27 +7,28 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/zmb3/spotify/v2"
+	spotifypkg "github.com/zmb3/spotify/v2"
 
 	"audio-scraper/internal/constants"
 	"audio-scraper/internal/logger"
 	"audio-scraper/internal/models"
-	"audio-scraper/internal/ports"
-	"audio-scraper/internal/providers"
+	"audio-scraper/internal/pool"
+	"audio-scraper/internal/providers/spotify"
+	"audio-scraper/internal/providers/store"
 )
 
 type Deps struct {
-	Log     ports.Logger
-	Spotify providers.SpotifyProvider
-	Store   providers.StoreProvider
-	Queue   ports.DownloadQueue
+	Log     logger.Logger
+	Spotify *spotify.SpotifyClient
+	Store   *store.Store
+	Queue   *pool.DownloadWorkerPool
 }
 
 type Handlers struct {
-	log     ports.Logger
-	spotify providers.SpotifyProvider
-	store   providers.StoreProvider
-	queue   ports.DownloadQueue
+	log     logger.Logger
+	spotify *spotify.SpotifyClient
+	store   *store.Store
+	queue   *pool.DownloadWorkerPool
 }
 
 func NewHandlers(deps *Deps) *Handlers {
@@ -52,7 +53,7 @@ func (h *Handlers) Search(w http.ResponseWriter, r *http.Request) {
 	}
 	queries := strings.Split(searchQuery, ",")
 
-	var allChoices []models.Choice
+	var allChoices []store.Choice
 	for _, query := range queries {
 		query = strings.TrimSpace(query)
 		if query == "" {
@@ -60,7 +61,7 @@ func (h *Handlers) Search(w http.ResponseWriter, r *http.Request) {
 		}
 
 		log := log.With("query", query)
-		results, err := h.spotify.Search(logger.Into(ctx, log), query, spotify.SearchTypeArtist|spotify.SearchTypeAlbum|spotify.SearchTypeTrack)
+		results, err := h.spotify.Search(logger.Into(ctx, log), query, spotifypkg.SearchTypeArtist|spotifypkg.SearchTypeAlbum|spotifypkg.SearchTypeTrack)
 		if err != nil {
 			log.Error("spotify search failed", "error", err)
 			http.Error(w, "spotify search failed", http.StatusInternalServerError)
@@ -111,7 +112,7 @@ func (h *Handlers) Download(w http.ResponseWriter, r *http.Request) {
 
 	log.Info("download request received", "selections", req.Choices)
 
-	resolved := make([]*models.Choice, 0, len(req.Choices))
+	resolved := make([]*store.Choice, 0, len(req.Choices))
 	for _, choice := range req.Choices {
 		c := data.FindByLabel(choice)
 		if c == nil {
@@ -123,7 +124,7 @@ func (h *Handlers) Download(w http.ResponseWriter, r *http.Request) {
 	}
 
 	reqID := req.RequestID
-	go func(log ports.Logger, reqID string, choices []*models.Choice) {
+	go func(log logger.Logger, reqID string, choices []*store.Choice) {
 		for _, c := range choices {
 			clog := log.With("type", c.Type, "id", c.ID)
 			clog.Info("processing choice")
@@ -136,11 +137,11 @@ func (h *Handlers) Download(w http.ResponseWriter, r *http.Request) {
 
 			switch c.Type {
 			case constants.SpotifyEntityTypeTrack:
-				addTrackToQueue(deps, reqID, spotify.ID(c.ID))
+				addTrackToQueue(deps, reqID, spotifypkg.ID(c.ID))
 			case constants.SpotifyEntityTypeAlbum:
-				addAlbumToQueue(deps, reqID, spotify.ID(c.ID))
+				addAlbumToQueue(deps, reqID, spotifypkg.ID(c.ID))
 			case constants.SpotifyEntityTypeArtist:
-				addArtistToQueue(deps, reqID, spotify.ID(c.ID))
+				addArtistToQueue(deps, reqID, spotifypkg.ID(c.ID))
 			default:
 				clog.Warn("unknown choice type", "type", c.Type)
 			}

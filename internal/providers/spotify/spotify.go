@@ -1,4 +1,4 @@
-package providers
+package spotify
 
 import (
 	"context"
@@ -13,7 +13,7 @@ import (
 	"audio-scraper/internal/logger"
 )
 
-type spotifyProvider struct {
+type SpotifyClient struct {
 	config *clientcredentials.Config
 	client *spotify.Client
 
@@ -22,14 +22,7 @@ type spotifyProvider struct {
 	mu sync.RWMutex
 }
 
-type SpotifyProvider interface {
-	Search(ctx context.Context, query string, t spotify.SearchType, opts ...spotify.RequestOption) (*spotify.SearchResult, error)
-	GetTrack(ctx context.Context, id spotify.ID, opts ...spotify.RequestOption) (*spotify.FullTrack, error)
-	GetAlbum(ctx context.Context, id spotify.ID, opts ...spotify.RequestOption) (*spotify.FullAlbum, error)
-	GetArtist(ctx context.Context, id spotify.ID, opts ...spotify.RequestOption) (*spotify.SimpleAlbumPage, error)
-}
-
-func NewSpotifyProvider(clientID string, clientSecret string) (SpotifyProvider, error) {
+func NewSpotifyProvider(clientID string, clientSecret string) (*SpotifyClient, error) {
 	if clientID == "" {
 		return nil, errors.New("missing SPOTIFY_CLIENT_ID")
 	}
@@ -42,7 +35,7 @@ func NewSpotifyProvider(clientID string, clientSecret string) (SpotifyProvider, 
 		TokenURL:     spotifyauth.TokenURL,
 	}
 
-	p := &spotifyProvider{config: config}
+	p := &SpotifyClient{config: config}
 	if err := p.refreshClient(context.Background()); err != nil {
 		return nil, err
 	}
@@ -60,7 +53,7 @@ func newSpotifyClient(ctx context.Context, config *clientcredentials.Config) (*s
 	return client, token.Expiry, nil
 }
 
-func (p *spotifyProvider) refreshClient(ctx context.Context) error {
+func (p *SpotifyClient) refreshClient(ctx context.Context) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -78,7 +71,7 @@ func (p *spotifyProvider) refreshClient(ctx context.Context) error {
 	return nil
 }
 
-func (p *spotifyProvider) withClient(ctx context.Context) (*spotify.Client, error) {
+func (p *SpotifyClient) withClient(ctx context.Context) (*spotify.Client, error) {
 	p.mu.RLock()
 	client := p.client
 	expiry := p.tokenExpiry
@@ -97,7 +90,7 @@ func (p *spotifyProvider) withClient(ctx context.Context) (*spotify.Client, erro
 	return client, nil
 }
 
-func (s *spotifyProvider) Search(ctx context.Context, query string, t spotify.SearchType, opts ...spotify.RequestOption) (*spotify.SearchResult, error) {
+func (s *SpotifyClient) Search(ctx context.Context, query string, t spotify.SearchType, opts ...spotify.RequestOption) (*spotify.SearchResult, error) {
 	log := logger.From(ctx)
 	log.Info("performing spotify search", "query", query, "type", t)
 	client, err := s.withClient(ctx)
@@ -107,7 +100,7 @@ func (s *spotifyProvider) Search(ctx context.Context, query string, t spotify.Se
 	return client.Search(ctx, query, t, opts...)
 }
 
-func (s *spotifyProvider) GetTrack(ctx context.Context, id spotify.ID, opts ...spotify.RequestOption) (*spotify.FullTrack, error) {
+func (s *SpotifyClient) GetTrack(ctx context.Context, id spotify.ID, opts ...spotify.RequestOption) (*spotify.FullTrack, error) {
 	log := logger.From(ctx)
 	log.Info("fetching spotify track", "track_id", id)
 	client, err := s.withClient(ctx)
@@ -117,7 +110,7 @@ func (s *spotifyProvider) GetTrack(ctx context.Context, id spotify.ID, opts ...s
 	return client.GetTrack(ctx, id, opts...)
 }
 
-func (s *spotifyProvider) GetAlbum(ctx context.Context, id spotify.ID, opts ...spotify.RequestOption) (*spotify.FullAlbum, error) {
+func (s *SpotifyClient) GetAlbum(ctx context.Context, id spotify.ID, opts ...spotify.RequestOption) (*spotify.FullAlbum, error) {
 	log := logger.From(ctx)
 	log.Info("fetching spotify album", "album_id", id)
 	client, err := s.withClient(ctx)
@@ -127,7 +120,7 @@ func (s *spotifyProvider) GetAlbum(ctx context.Context, id spotify.ID, opts ...s
 	return client.GetAlbum(ctx, id, opts...)
 }
 
-func (s *spotifyProvider) GetArtist(ctx context.Context, id spotify.ID, opts ...spotify.RequestOption) (*spotify.SimpleAlbumPage, error) {
+func (s *SpotifyClient) GetArtist(ctx context.Context, id spotify.ID, opts ...spotify.RequestOption) (*spotify.SimpleAlbumPage, error) {
 	log := logger.From(ctx)
 	log.Info("fetching spotify artist", "artist_id", id)
 	albumTypes := []spotify.AlbumType{spotify.AlbumTypeAlbum, spotify.AlbumTypeSingle, spotify.AlbumTypeAppearsOn, spotify.AlbumTypeCompilation}

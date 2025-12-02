@@ -1,4 +1,4 @@
-package providers
+package filesystem
 
 import (
 	"context"
@@ -16,29 +16,25 @@ import (
 
 	"audio-scraper/internal/logger"
 	"audio-scraper/internal/models"
+	"audio-scraper/internal/providers/lrclib"
 )
 
-type fsClient struct {
+type FSClient struct {
 	musicHome string
-	lrc       LrclibProvider
+	lrc       *lrclib.LrclibClient
 }
 
-type FSProvider interface {
-	InitializePath(ctx context.Context, job *models.DownloadJob) (string, error)
-	TagFile(ctx context.Context, filePath string, job *models.DownloadJob) error
-}
-
-func NewFSProvider(musicHome string, lrc LrclibProvider) (FSProvider, error) {
+func NewFSProvider(musicHome string, lrc *lrclib.LrclibClient) (*FSClient, error) {
 	if musicHome == "" {
 		return nil, errors.New("missing MUSIC_HOME")
 	}
-	return &fsClient{
+	return &FSClient{
 		musicHome: musicHome,
 		lrc:       lrc,
 	}, nil
 }
 
-func (f *fsClient) InitializePath(ctx context.Context, job *models.DownloadJob) (string, error) {
+func (f *FSClient) InitializePath(ctx context.Context, job *models.DownloadJob) (string, error) {
 	log := logger.From(ctx)
 	path := filepath.Join(
 		f.musicHome,
@@ -67,7 +63,7 @@ func (f *fsClient) InitializePath(ctx context.Context, job *models.DownloadJob) 
 	return outputPath, nil
 }
 
-func (f *fsClient) TagFile(ctx context.Context, filePath string, job *models.DownloadJob) error {
+func (f *FSClient) TagFile(ctx context.Context, filePath string, job *models.DownloadJob) error {
 	log := logger.From(ctx)
 	tag, err := id3v2.Open(filePath, id3v2.Options{Parse: true})
 	if err != nil {
@@ -81,7 +77,7 @@ func (f *fsClient) TagFile(ctx context.Context, filePath string, job *models.Dow
 	tag.SetArtist(job.Artist)
 	tag.SetAlbum(job.Album)
 
-	lyrics, err := f.lrc.FindLyrics(ctx, &models.LrclibRequest{
+	lyrics, err := f.lrc.FindLyrics(ctx, &lrclib.LrclibRequest{
 		Artist:   job.Artist,
 		Album:    job.Album,
 		Track:    job.Track,

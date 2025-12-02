@@ -4,23 +4,24 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/zmb3/spotify/v2"
+	spotifypkg "github.com/zmb3/spotify/v2"
 
 	"audio-scraper/internal/constants"
 	"audio-scraper/internal/logger"
 	"audio-scraper/internal/models"
-	"audio-scraper/internal/ports"
-	"audio-scraper/internal/providers"
+	"audio-scraper/internal/pool"
+	"audio-scraper/internal/providers/spotify"
+	"audio-scraper/internal/providers/store"
 )
 
-func processSearchData(result *spotify.SearchResult, log ports.Logger) ([]models.Choice, error) {
+func processSearchData(result *spotifypkg.SearchResult, log logger.Logger) ([]store.Choice, error) {
 	trackCount := 10
 	albumCount := 5
 	artistCount := 3
 
-	var tracks []spotify.FullTrack
-	var albums []spotify.SimpleAlbum
-	var artists []spotify.FullArtist
+	var tracks []spotifypkg.FullTrack
+	var albums []spotifypkg.SimpleAlbum
+	var artists []spotifypkg.FullArtist
 	if result.Tracks != nil {
 		tracks = result.Tracks.Tracks
 		log.Debug("tracks found", "count", len(tracks))
@@ -44,7 +45,7 @@ func processSearchData(result *spotify.SearchResult, log ports.Logger) ([]models
 	}
 	log.Debug("reallocated counts", "tracks", trackCount, "albums", albumCount, "artists", artistCount)
 
-	var choices []models.Choice
+	var choices []store.Choice
 	for i := 0; i < min(trackCount, len(tracks)); i++ {
 		t := tracks[i]
 		artistName := ""
@@ -53,7 +54,7 @@ func processSearchData(result *spotify.SearchResult, log ports.Logger) ([]models
 		}
 		label := fmt.Sprintf("Track: %s - %s [%s]", t.Name, artistName, t.Album.Name)
 
-		choice := models.Choice{
+		choice := store.Choice{
 			Type:  constants.SpotifyEntityTypeTrack,
 			ID:    t.ID.String(),
 			Label: label,
@@ -69,7 +70,7 @@ func processSearchData(result *spotify.SearchResult, log ports.Logger) ([]models
 		}
 		label := fmt.Sprintf("Album: %s - %s", a.Name, artistName)
 
-		choice := models.Choice{
+		choice := store.Choice{
 			Type:  constants.SpotifyEntityTypeAlbum,
 			ID:    a.ID.String(),
 			Label: label,
@@ -81,7 +82,7 @@ func processSearchData(result *spotify.SearchResult, log ports.Logger) ([]models
 		ar := artists[i]
 		label := fmt.Sprintf("Artist: %s", ar.Name)
 
-		choice := models.Choice{
+		choice := store.Choice{
 			Type:  constants.SpotifyEntityTypeArtist,
 			ID:    ar.ID.String(),
 			Label: label,
@@ -93,17 +94,17 @@ func processSearchData(result *spotify.SearchResult, log ports.Logger) ([]models
 }
 
 type addToQueueDeps struct {
-	log ports.Logger
-	sp  providers.SpotifyProvider
-	q   ports.DownloadQueue
+	log logger.Logger
+	sp  *spotify.SpotifyClient
+	q   *pool.DownloadWorkerPool
 }
 
-func addTrackToQueue(deps addToQueueDeps, requestID string, trackID spotify.ID) {
+func addTrackToQueue(deps addToQueueDeps, requestID string, trackID spotifypkg.ID) {
 	ctx := context.Background()
 	log := deps.log.With("track_id", trackID)
 	log.Info("adding track to download queue")
 
-	track, err := deps.sp.GetTrack(logger.Into(ctx, log), spotify.ID(trackID))
+	track, err := deps.sp.GetTrack(logger.Into(ctx, log), spotifypkg.ID(trackID))
 	if err != nil {
 		log.Error("failed to fetch track details", "error", err)
 		return
@@ -127,7 +128,7 @@ func addTrackToQueue(deps addToQueueDeps, requestID string, trackID spotify.ID) 
 	log.Info("track added to download queue successfully")
 }
 
-func addAlbumToQueue(deps addToQueueDeps, requestID string, albumID spotify.ID) {
+func addAlbumToQueue(deps addToQueueDeps, requestID string, albumID spotifypkg.ID) {
 	ctx := context.Background()
 	log := deps.log.With("album_id", albumID)
 
@@ -143,7 +144,7 @@ func addAlbumToQueue(deps addToQueueDeps, requestID string, albumID spotify.ID) 
 	log.Info("album added to download queue successfully")
 }
 
-func addArtistToQueue(deps addToQueueDeps, requestID string, artistID spotify.ID) {
+func addArtistToQueue(deps addToQueueDeps, requestID string, artistID spotifypkg.ID) {
 	ctx := context.Background()
 	log := deps.log.With("artist_id", artistID)
 

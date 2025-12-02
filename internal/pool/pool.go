@@ -1,5 +1,5 @@
-// Package services implements a download worker pool for processing download jobs concurrently.
-package services
+// Package pool implements a download worker pool for processing download jobs concurrently.
+package pool
 
 import (
 	"context"
@@ -7,26 +7,26 @@ import (
 
 	"audio-scraper/internal/logger"
 	"audio-scraper/internal/models"
-	"audio-scraper/internal/ports"
-	"audio-scraper/internal/providers"
+	"audio-scraper/internal/providers/filesystem"
+	"audio-scraper/internal/providers/youtube"
 )
 
 type DownloadWorkerPool struct {
 	jobs    chan models.DownloadJob
 	workers int
 
-	log ports.Logger
-	yt  providers.YTProvider
-	fs  providers.FSProvider
+	log logger.Logger
+	yt  *youtube.YTClient
+	fs  *filesystem.FSClient
 
 	wg   sync.WaitGroup
 	stop chan struct{}
 }
 
 type Deps struct {
-	Log ports.Logger
-	YT  providers.YTProvider
-	FS  providers.FSProvider
+	Log logger.Logger
+	YT  *youtube.YTClient
+	FS  *filesystem.FSClient
 }
 
 func NewDownloadWorkerPool(

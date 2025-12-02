@@ -1,36 +1,47 @@
-package providers
+package store
 
 import (
 	"sync"
 	"time"
 
-	"audio-scraper/internal/models"
-	"audio-scraper/internal/ports"
+	"audio-scraper/internal/constants"
+	"audio-scraper/internal/logger"
 )
 
 const cleanupInterval = 30 * time.Minute
 const storeTTL = 10 * time.Minute
 
+type Choice struct {
+	Type  constants.SpotifyEntityType `json:"type"`
+	ID    string                      `json:"id"`
+	Label string                      `json:"label"`
+}
+
+type Choices []Choice
+
+func (choices Choices) FindByLabel(label string) *Choice {
+	for _, choice := range choices {
+		if choice.Label == label {
+			return &choice
+		}
+	}
+	return nil
+}
+
 type choiceItem struct {
-	choices   models.Choices
+	choices   Choices
 	timestamp time.Time
 }
 
-type storeClient struct {
-	log         ports.Logger
+type Store struct {
+	log         logger.Logger
 	requestData map[string]choiceItem
 	mu          sync.RWMutex
 	done        chan struct{}
 }
 
-type StoreProvider interface {
-	Set(key string, choices models.Choices)
-	Get(key string) (models.Choices, bool)
-	Delete(key string)
-}
-
-func NewStoreProvider(l ports.Logger) StoreProvider {
-	store := &storeClient{
+func NewStoreProvider(l logger.Logger) *Store {
+	store := &Store{
 		log:         l,
 		requestData: make(map[string]choiceItem),
 		done:        make(chan struct{}),
@@ -40,7 +51,7 @@ func NewStoreProvider(l ports.Logger) StoreProvider {
 	return store
 }
 
-func (s *storeClient) Set(key string, choices models.Choices) {
+func (s *Store) Set(key string, choices Choices) {
 	s.log.Info("storing data in store", "key", key)
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -50,7 +61,7 @@ func (s *storeClient) Set(key string, choices models.Choices) {
 	}
 }
 
-func (s *storeClient) Get(key string) (models.Choices, bool) {
+func (s *Store) Get(key string) (Choices, bool) {
 	s.log.Info("retrieving data from store", "key", key)
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -58,14 +69,14 @@ func (s *storeClient) Get(key string) (models.Choices, bool) {
 	return choices.choices, exists
 }
 
-func (s *storeClient) Delete(key string) {
+func (s *Store) Delete(key string) {
 	s.log.Info("deleting data from store", "key", key)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	delete(s.requestData, key)
 }
 
-func (s *storeClient) cleanupRoutine() {
+func (s *Store) cleanupRoutine() {
 	ticker := time.NewTicker(cleanupInterval)
 	defer ticker.Stop()
 
@@ -79,7 +90,7 @@ func (s *storeClient) cleanupRoutine() {
 	}
 }
 
-func (s *storeClient) purgeExpiredKeys() {
+func (s *Store) purgeExpiredKeys() {
 	s.log.Debug("running scheduled cleanup of expired keys")
 	cutoff := time.Now().Add(-storeTTL)
 
@@ -97,6 +108,6 @@ func (s *storeClient) purgeExpiredKeys() {
 	s.log.Info("cleanup complete", "removed_keys", count)
 }
 
-func (s *storeClient) Shutdown() {
+func (s *Store) Shutdown() {
 	close(s.done)
 }

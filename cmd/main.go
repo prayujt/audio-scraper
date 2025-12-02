@@ -12,8 +12,12 @@ import (
 	"audio-scraper/internal/api"
 	"audio-scraper/internal/constants"
 	"audio-scraper/internal/logger"
-	"audio-scraper/internal/providers"
-	"audio-scraper/internal/services"
+	"audio-scraper/internal/pool"
+	"audio-scraper/internal/providers/filesystem"
+	"audio-scraper/internal/providers/lrclib"
+	"audio-scraper/internal/providers/spotify"
+	"audio-scraper/internal/providers/store"
+	"audio-scraper/internal/providers/youtube"
 )
 
 func main() {
@@ -25,15 +29,15 @@ func main() {
 	}
 	log.Info("started server", "host", "0.0.0.0", "port", port)
 
-	sp, err := providers.NewSpotifyProvider(os.Getenv("SPOTIFY_CLIENT_ID"), os.Getenv("SPOTIFY_CLIENT_SECRET"))
+	sp, err := spotify.NewSpotifyProvider(os.Getenv("SPOTIFY_CLIENT_ID"), os.Getenv("SPOTIFY_CLIENT_SECRET"))
 	if err != nil {
 		log.Error("failed to initialize Spotify provider", "error", err)
 		return
 	}
-	st := providers.NewStoreProvider(log)
-	yt := providers.NewYTProvider()
-	lrc := providers.NewLrclibProvider()
-	fs, err := providers.NewFSProvider(os.Getenv("MUSIC_HOME"), lrc)
+	st := store.NewStoreProvider(log)
+	yt := youtube.NewYTProvider()
+	lrc := lrclib.NewLrclibProvider()
+	fs, err := filesystem.NewFSProvider(os.Getenv("MUSIC_HOME"), lrc)
 	if err != nil {
 		log.Error("failed to initialize filesystem provider", "error", err)
 		return
@@ -44,7 +48,7 @@ func main() {
 	if err != nil || poolSize <= 0 {
 		poolSize = constants.DownloadWorkerPoolSize
 	}
-	q := services.NewDownloadWorkerPool(poolSize, &services.Deps{
+	q := pool.NewDownloadWorkerPool(poolSize, &pool.Deps{
 		Log: log,
 		YT:  yt,
 		FS:  fs,
