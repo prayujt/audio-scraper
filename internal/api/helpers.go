@@ -10,6 +10,7 @@ import (
 	"audio-scraper/internal/logger"
 	"audio-scraper/internal/models"
 	"audio-scraper/internal/ports"
+	"audio-scraper/internal/providers"
 )
 
 func processSearchData(result *spotify.SearchResult, log ports.Logger) ([]models.Choice, error) {
@@ -93,7 +94,7 @@ func processSearchData(result *spotify.SearchResult, log ports.Logger) ([]models
 
 type addToQueueDeps struct {
 	log ports.Logger
-	sp  ports.SpotifyProvider
+	sp  providers.SpotifyProvider
 	q   ports.DownloadQueue
 }
 

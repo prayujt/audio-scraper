@@ -23,7 +23,13 @@ type storeClient struct {
 	done        chan struct{}
 }
 
-func NewStoreProvider(l ports.Logger) ports.StoreProvider {
+type StoreProvider interface {
+	Set(key string, choices models.Choices)
+	Get(key string) (models.Choices, bool)
+	Delete(key string)
+}
+
+func NewStoreProvider(l ports.Logger) StoreProvider {
 	store := &storeClient{
 		log:         l,
 		requestData: make(map[string]choiceItem),

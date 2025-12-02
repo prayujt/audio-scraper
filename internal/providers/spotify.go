@@ -11,7 +11,6 @@ import (
 	"golang.org/x/oauth2/clientcredentials"
 
 	"audio-scraper/internal/logger"
-	"audio-scraper/internal/ports"
 )
 
 type spotifyProvider struct {
@@ -23,7 +22,14 @@ type spotifyProvider struct {
 	mu sync.RWMutex
 }
 
-func NewSpotifyProvider(clientID string, clientSecret string) (ports.SpotifyProvider, error) {
+type SpotifyProvider interface {
+	Search(ctx context.Context, query string, t spotify.SearchType, opts ...spotify.RequestOption) (*spotify.SearchResult, error)
+	GetTrack(ctx context.Context, id spotify.ID, opts ...spotify.RequestOption) (*spotify.FullTrack, error)
+	GetAlbum(ctx context.Context, id spotify.ID, opts ...spotify.RequestOption) (*spotify.FullAlbum, error)
+	GetArtist(ctx context.Context, id spotify.ID, opts ...spotify.RequestOption) (*spotify.SimpleAlbumPage, error)
+}
+
+func NewSpotifyProvider(clientID string, clientSecret string) (SpotifyProvider, error) {
 	if clientID == "" {
 		return nil, errors.New("missing SPOTIFY_CLIENT_ID")
 	}

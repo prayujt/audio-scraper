@@ -16,15 +16,19 @@ import (
 
 	"audio-scraper/internal/logger"
 	"audio-scraper/internal/models"
-	"audio-scraper/internal/ports"
 )
 
 type fsClient struct {
 	musicHome string
-	lrc       ports.LrclibProvider
+	lrc       LrclibProvider
 }
 
-func NewFSProvider(musicHome string, lrc ports.LrclibProvider) (ports.FSProvider, error) {
+type FSProvider interface {
+	InitializePath(ctx context.Context, job *models.DownloadJob) (string, error)
+	TagFile(ctx context.Context, filePath string, job *models.DownloadJob) error
+}
+
+func NewFSProvider(musicHome string, lrc LrclibProvider) (FSProvider, error) {
 	if musicHome == "" {
 		return nil, errors.New("missing MUSIC_HOME")
 	}

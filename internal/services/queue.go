@@ -8,6 +8,7 @@ import (
 	"audio-scraper/internal/logger"
 	"audio-scraper/internal/models"
 	"audio-scraper/internal/ports"
+	"audio-scraper/internal/providers"
 )
 
 type DownloadWorkerPool struct {
@@ -15,8 +16,8 @@ type DownloadWorkerPool struct {
 	workers int
 
 	log ports.Logger
-	yt  ports.YTProvider
-	fs  ports.FSProvider
+	yt  providers.YTProvider
+	fs  providers.FSProvider
 
 	wg   sync.WaitGroup
 	stop chan struct{}
@@ -24,8 +25,8 @@ type DownloadWorkerPool struct {
 
 type Deps struct {
 	Log ports.Logger
-	YT  ports.YTProvider
-	FS  ports.FSProvider
+	YT  providers.YTProvider
+	FS  providers.FSProvider
 }
 
 func NewDownloadWorkerPool(

@@ -9,12 +9,16 @@ import (
 	"github.com/faiface/beep/mp3"
 
 	"audio-scraper/internal/logger"
-	"audio-scraper/internal/ports"
 )
 
 type youtubeClient struct{}
 
-func NewYTProvider() ports.YTProvider {
+type YTProvider interface {
+	Search(ctx context.Context, track string, album string, artist string) (string, error)
+	Download(ctx context.Context, path string, videoURL string) (int, error)
+}
+
+func NewYTProvider() YTProvider {
 	return &youtubeClient{}
 }
 

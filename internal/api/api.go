@@ -13,19 +13,20 @@ import (
 	"audio-scraper/internal/logger"
 	"audio-scraper/internal/models"
 	"audio-scraper/internal/ports"
+	"audio-scraper/internal/providers"
 )
 
 type Deps struct {
 	Log     ports.Logger
-	Spotify ports.SpotifyProvider
-	Store   ports.StoreProvider
+	Spotify providers.SpotifyProvider
+	Store   providers.StoreProvider
 	Queue   ports.DownloadQueue
 }
 
 type Handlers struct {
 	log     ports.Logger
-	spotify ports.SpotifyProvider
-	store   ports.StoreProvider
+	spotify providers.SpotifyProvider
+	store   providers.StoreProvider
 	queue   ports.DownloadQueue
 }
 

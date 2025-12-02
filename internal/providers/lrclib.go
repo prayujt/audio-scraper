@@ -13,8 +13,11 @@ import (
 
 	"audio-scraper/internal/logger"
 	"audio-scraper/internal/models"
-	"audio-scraper/internal/ports"
 )
+
+type LrclibProvider interface {
+	FindLyrics(ctx context.Context, req *models.LrclibRequest) (*models.LRC, error)
+}
 
 const lrclibBaseURL = "https://lrclib.net/api/get"
 
@@ -22,7 +25,7 @@ type lrclibProvider struct {
 	client *http.Client
 }
 
-func NewLrclibProvider() ports.LrclibProvider {
+func NewLrclibProvider() LrclibProvider {
 	client := &http.Client{
 		Timeout: 5 * time.Second,
 		Transport: &http.Transport{
