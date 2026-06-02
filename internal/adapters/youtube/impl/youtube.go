@@ -10,6 +10,7 @@ import (
 	"math"
 	"os"
 	"os/exec"
+	"sort"
 	"strings"
 
 	"github.com/faiface/beep/mp3"
@@ -45,6 +46,22 @@ type ytSearchResponse struct {
 }
 
 func (y *Client) Search(ctx context.Context, track, artist string, duration int) (string, error) {
+	candidates, err := y.Candidates(ctx, track, artist, duration)
+	if err != nil {
+		return "", err
+	}
+	if len(candidates) == 0 {
+		return "", errors.New("yt search returned no usable results")
+	}
+	best := candidates[0]
+	logger.From(ctx).Info("yt search selected", "url", best.URL, "title", best.Title)
+	return best.URL, nil
+}
+
+// Candidates runs a ytsearch and returns the entries ranked by score, best
+// first. It mirrors the ranking used by Search but exposes the full list for
+// manual selection.
+func (y *Client) Candidates(ctx context.Context, track, artist string, duration int) ([]youtube.Candidate, error) {
 	log := logger.From(ctx)
 	query := strings.TrimSpace(track + " " + artist)
 	log.Info("performing yt search", "query", query, "duration", duration)
@@ -60,37 +77,44 @@ func (y *Client) Search(ctx context.Context, track, artist string, duration int)
 	out, err := cmd.Output()
 	if err != nil {
 		log.Error("yt search command failed", "error", err)
-		return "", errors.New("yt search failed")
+		return nil, errors.New("yt search failed")
 	}
 
 	var res ytSearchResponse
 	if err := json.Unmarshal(out, &res); err != nil {
 		log.Error("failed to parse yt search output", "error", err)
-		return "", errors.New("yt search failed")
-	}
-	if len(res.Entries) == 0 {
-		return "", errors.New("yt search returned no results")
+		return nil, errors.New("yt search failed")
 	}
 
-	best := -1
-	bestScore := math.Inf(-1)
-	for i, e := range res.Entries {
+	type scored struct {
+		entry ytEntry
+		score float64
+	}
+	var ranked []scored
+	for _, e := range res.Entries {
 		if e.ID == "" {
 			continue
 		}
-		if s := score(track, artist, duration, e); s > bestScore {
-			bestScore = s
-			best = i
-		}
+		ranked = append(ranked, scored{entry: e, score: score(track, artist, duration, e)})
 	}
-	if best == -1 {
-		return "", errors.New("yt search returned no usable results")
-	}
+	sort.SliceStable(ranked, func(i, j int) bool {
+		return ranked[i].score > ranked[j].score
+	})
 
-	selected := res.Entries[best]
-	url := "https://www.youtube.com/watch?v=" + selected.ID
-	log.Info("yt search selected", "url", url, "title", selected.Title, "score", bestScore)
-	return url, nil
+	candidates := make([]youtube.Candidate, 0, len(ranked))
+	for _, r := range ranked {
+		uploader := r.entry.Uploader
+		if uploader == "" {
+			uploader = r.entry.Channel
+		}
+		candidates = append(candidates, youtube.Candidate{
+			URL:      "https://www.youtube.com/watch?v=" + r.entry.ID,
+			Title:    r.entry.Title,
+			Uploader: uploader,
+			Duration: int(r.entry.Duration),
+		})
+	}
+	return candidates, nil
 }
 
 // score rates how well a search result matches the desired track. Higher is
@@ -184,9 +208,6 @@ func (y *Client) Download(ctx context.Context, path, videoURL string) (int, erro
 		"-x",
 		"--audio-quality", "0",
 		"--audio-format", "mp3",
-		// The android player client avoids YouTube's SABR streaming, which
-		// otherwise 403s without a JS runtime.
-		"--extractor-args", "youtube:player_client=android",
 		"-o", path,
 		videoURL,
 	)

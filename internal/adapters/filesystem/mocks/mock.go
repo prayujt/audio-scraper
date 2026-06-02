@@ -12,9 +12,17 @@ import (
 type Mock struct {
 	InitializePathFunc func(ctx context.Context, job *models.DownloadJob) (string, error)
 	TagFileFunc        func(ctx context.Context, filePath string, job *models.DownloadJob) error
+	ReplaceAudioFunc   func(ctx context.Context, job *models.DownloadJob, download func(ctx context.Context, dest string) error) error
 }
 
 var _ filesystem.Provider = (*Mock)(nil)
+
+func (m *Mock) ReplaceAudio(ctx context.Context, job *models.DownloadJob, download func(ctx context.Context, dest string) error) error {
+	if m.ReplaceAudioFunc != nil {
+		return m.ReplaceAudioFunc(ctx, job, download)
+	}
+	return nil
+}
 
 func (m *Mock) InitializePath(ctx context.Context, job *models.DownloadJob) (string, error) {
 	if m.InitializePathFunc != nil {

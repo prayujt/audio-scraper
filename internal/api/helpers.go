@@ -6,11 +6,66 @@ import (
 
 	"audio-scraper/internal/adapters/itunes"
 	"audio-scraper/internal/adapters/store"
+	"audio-scraper/internal/adapters/subsonic"
+	"audio-scraper/internal/adapters/youtube"
 	"audio-scraper/internal/constants"
 	"audio-scraper/internal/logger"
 	"audio-scraper/internal/models"
 	"audio-scraper/internal/pool"
 )
+
+// choiceLabels extracts the display labels from a set of choices.
+func choiceLabels(choices []store.Choice) []string {
+	var labels []string
+	for _, c := range choices {
+		labels = append(labels, c.Label)
+	}
+	return labels
+}
+
+// songsToChoices turns Subsonic library songs into selectable choices, carrying
+// the song identity needed by later replacement steps.
+func songsToChoices(songs []subsonic.Song) []store.Choice {
+	var choices []store.Choice
+	for _, s := range songs {
+		choices = append(choices, store.Choice{
+			Type:     constants.EntityTypeSong,
+			ID:       s.ID,
+			Label:    fmt.Sprintf("%s - %s [%s]", s.Title, s.Artist, s.Album),
+			Artist:   s.Artist,
+			Album:    s.Album,
+			Track:    s.Title,
+			Duration: s.Duration,
+		})
+	}
+	return choices
+}
+
+// candidatesToChoices turns YouTube candidates into selectable choices,
+// denormalizing the song identity onto each so /replace is self-contained.
+func candidatesToChoices(cands []youtube.Candidate, song *store.Choice) []store.Choice {
+	var choices []store.Choice
+	for _, c := range cands {
+		choices = append(choices, store.Choice{
+			Type:     constants.EntityTypeCandidate,
+			Label:    fmt.Sprintf("%s — %s (%s)", c.Title, c.Uploader, fmtDuration(c.Duration)),
+			URL:      c.URL,
+			Artist:   song.Artist,
+			Album:    song.Album,
+			Track:    song.Track,
+			Duration: song.Duration,
+		})
+	}
+	return choices
+}
+
+// fmtDuration formats seconds as m:ss, or "?" when unknown.
+func fmtDuration(sec int) string {
+	if sec <= 0 {
+		return "?"
+	}
+	return fmt.Sprintf("%d:%02d", sec/60, sec%60)
+}
 
 func processSearchData(result models.SearchResult, log logger.Logger) []store.Choice {
 	trackCount := 10

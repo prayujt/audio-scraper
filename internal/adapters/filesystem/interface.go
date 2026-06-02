@@ -16,4 +16,9 @@ type Provider interface {
 	InitializePath(ctx context.Context, job *models.DownloadJob) (string, error)
 	// TagFile writes ID3 metadata, cover art and lyrics to the file at filePath.
 	TagFile(ctx context.Context, filePath string, job *models.DownloadJob) error
+	// ReplaceAudio swaps the audio of the existing file for job (located by
+	// Artist/Album/Track) with freshly downloaded audio, preserving the file's
+	// existing tags. download must write an mp3 to the dest path it is given.
+	// The original file is left intact if anything fails.
+	ReplaceAudio(ctx context.Context, job *models.DownloadJob, download func(ctx context.Context, dest string) error) error
 }
