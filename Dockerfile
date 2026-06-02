@@ -14,8 +14,10 @@ WORKDIR /app
 
 COPY --from=build /app/bin/audio-scraper /app/audio-scraper
 
-RUN apk update && \
-	apk add -U yt-dlp ffmpeg
+# Install the latest yt-dlp from pip rather than the (often months-stale) Alpine
+# package, since YouTube extraction breaks quickly on old versions.
+RUN apk add --no-cache ffmpeg python3 py3-pip && \
+	pip install --no-cache-dir --break-system-packages -U yt-dlp
 
 EXPOSE 8080
 
