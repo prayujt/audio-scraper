@@ -10,7 +10,3 @@ services:
     env:
       - name: API_PORT
         value: 8080
-      - name: SPOTIFY_CLIENT_ID
-        value: ${SPOTIFY_CLIENT_ID}
-      - name: SPOTIFY_CLIENT_SECRET
-        value: ${SPOTIFY_CLIENT_SECRET}

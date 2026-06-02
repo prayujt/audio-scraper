@@ -3,10 +3,10 @@ package constants
 
 const DownloadWorkerPoolSize = 5
 
-type SpotifyEntityType string
+type EntityType string
 
 const (
-	SpotifyEntityTypeTrack  SpotifyEntityType = "track"
-	SpotifyEntityTypeAlbum  SpotifyEntityType = "album"
-	SpotifyEntityTypeArtist SpotifyEntityType = "artist"
+	EntityTypeTrack  EntityType = "track"
+	EntityTypeAlbum  EntityType = "album"
+	EntityTypeArtist EntityType = "artist"
 )

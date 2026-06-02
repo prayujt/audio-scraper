@@ -5,10 +5,10 @@ import (
 	"context"
 	"sync"
 
+	"audio-scraper/internal/adapters/filesystem"
+	"audio-scraper/internal/adapters/youtube"
 	"audio-scraper/internal/logger"
 	"audio-scraper/internal/models"
-	"audio-scraper/internal/providers/filesystem"
-	"audio-scraper/internal/providers/youtube"
 )
 
 type DownloadWorkerPool struct {
@@ -16,8 +16,8 @@ type DownloadWorkerPool struct {
 	workers int
 
 	log logger.Logger
-	yt  *youtube.YTClient
-	fs  *filesystem.FSClient
+	yt  youtube.Provider
+	fs  filesystem.Provider
 
 	wg   sync.WaitGroup
 	stop chan struct{}
@@ -25,8 +25,8 @@ type DownloadWorkerPool struct {
 
 type Deps struct {
 	Log logger.Logger
-	YT  *youtube.YTClient
-	FS  *filesystem.FSClient
+	YT  youtube.Provider
+	FS  filesystem.Provider
 }
 
 func NewDownloadWorkerPool(
@@ -70,7 +70,7 @@ func (p *DownloadWorkerPool) worker(id int) {
 
 			log.Info("processing download job")
 
-			videoURL, err := p.yt.Search(logger.Into(ctx, log), job.Track, job.Album, job.Artist)
+			videoURL, err := p.yt.Search(logger.Into(ctx, log), job.Track, job.Artist, job.Duration)
 			if err != nil {
 				log.Error("yt search failed", "error", err)
 				continue

@@ -1,38 +1,24 @@
-package store
+// Package storeimpl implements the store.Provider port as an in-memory cache
+// with TTL-based cleanup.
+package storeimpl
 
 import (
 	"sync"
 	"time"
 
-	"audio-scraper/internal/constants"
+	"audio-scraper/internal/adapters/store"
 	"audio-scraper/internal/logger"
 )
 
 const cleanupInterval = 30 * time.Minute
 const storeTTL = 10 * time.Minute
 
-type Choice struct {
-	Type  constants.SpotifyEntityType `json:"type"`
-	ID    string                      `json:"id"`
-	Label string                      `json:"label"`
-}
-
-type Choices []Choice
-
-func (choices Choices) FindByLabel(label string) *Choice {
-	for _, choice := range choices {
-		if choice.Label == label {
-			return &choice
-		}
-	}
-	return nil
-}
-
 type choiceItem struct {
-	choices   Choices
+	choices   store.Choices
 	timestamp time.Time
 }
 
+// Store is the in-memory request cache.
 type Store struct {
 	log         logger.Logger
 	requestData map[string]choiceItem
@@ -40,18 +26,21 @@ type Store struct {
 	done        chan struct{}
 }
 
-func NewStoreProvider(l logger.Logger) *Store {
-	store := &Store{
+var _ store.Provider = (*Store)(nil)
+
+// New returns an in-memory request cache and starts its cleanup routine.
+func New(l logger.Logger) *Store {
+	s := &Store{
 		log:         l,
 		requestData: make(map[string]choiceItem),
 		done:        make(chan struct{}),
 	}
 
-	go store.cleanupRoutine()
-	return store
+	go s.cleanupRoutine()
+	return s
 }
 
-func (s *Store) Set(key string, choices Choices) {
+func (s *Store) Set(key string, choices store.Choices) {
 	s.log.Info("storing data in store", "key", key)
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -61,7 +50,7 @@ func (s *Store) Set(key string, choices Choices) {
 	}
 }
 
-func (s *Store) Get(key string) (Choices, bool) {
+func (s *Store) Get(key string) (store.Choices, bool) {
 	s.log.Info("retrieving data from store", "key", key)
 	s.mu.RLock()
 	defer s.mu.RUnlock()

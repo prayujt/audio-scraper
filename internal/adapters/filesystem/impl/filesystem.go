@@ -1,4 +1,6 @@
-package filesystem
+// Package filesystemimpl implements the filesystem.Provider port: it writes
+// downloaded audio into a MUSIC_HOME/Artist/Album tree and tags the files.
+package filesystemimpl
 
 import (
 	"context"
@@ -14,27 +16,33 @@ import (
 
 	"github.com/bogem/id3v2/v2"
 
+	"audio-scraper/internal/adapters/filesystem"
+	"audio-scraper/internal/adapters/lrclib"
 	"audio-scraper/internal/logger"
 	"audio-scraper/internal/models"
-	"audio-scraper/internal/providers/lrclib"
 )
 
-type FSClient struct {
+// Client is the local-filesystem library provider.
+type Client struct {
 	musicHome string
-	lrc       *lrclib.LrclibClient
+	lrc       lrclib.Provider
 }
 
-func NewFSProvider(musicHome string, lrc *lrclib.LrclibClient) (*FSClient, error) {
+var _ filesystem.Provider = (*Client)(nil)
+
+// New returns a filesystem provider rooted at musicHome, using lrc to resolve
+// lyrics during tagging.
+func New(musicHome string, lrc lrclib.Provider) (*Client, error) {
 	if musicHome == "" {
 		return nil, errors.New("missing MUSIC_HOME")
 	}
-	return &FSClient{
+	return &Client{
 		musicHome: musicHome,
 		lrc:       lrc,
 	}, nil
 }
 
-func (f *FSClient) InitializePath(ctx context.Context, job *models.DownloadJob) (string, error) {
+func (f *Client) InitializePath(ctx context.Context, job *models.DownloadJob) (string, error) {
 	log := logger.From(ctx)
 	path := filepath.Join(
 		f.musicHome,
@@ -63,7 +71,7 @@ func (f *FSClient) InitializePath(ctx context.Context, job *models.DownloadJob) 
 	return outputPath, nil
 }
 
-func (f *FSClient) TagFile(ctx context.Context, filePath string, job *models.DownloadJob) error {
+func (f *Client) TagFile(ctx context.Context, filePath string, job *models.DownloadJob) error {
 	log := logger.From(ctx)
 	tag, err := id3v2.Open(filePath, id3v2.Options{Parse: true})
 	if err != nil {
