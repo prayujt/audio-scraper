@@ -4,6 +4,7 @@ go 1.24.5
 
 require (
 	github.com/bogem/id3v2/v2 v2.1.4
+	github.com/caarlos0/env/v11 v11.4.1
 	github.com/faiface/beep v1.1.0
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
