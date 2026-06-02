@@ -184,6 +184,9 @@ func (y *Client) Download(ctx context.Context, path, videoURL string) (int, erro
 		"-x",
 		"--audio-quality", "0",
 		"--audio-format", "mp3",
+		// The android player client avoids YouTube's SABR streaming, which
+		// otherwise 403s without a JS runtime.
+		"--extractor-args", "youtube:player_client=android",
 		"-o", path,
 		videoURL,
 	)
