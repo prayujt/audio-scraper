@@ -11,6 +11,13 @@ type DownloadRequest struct {
 	Choices   []string `json:"choices"`
 }
 
+// ChoiceRequest is a single-selection request referencing a previously returned
+// choice label (used by the replacement flow's candidate/replace steps).
+type ChoiceRequest struct {
+	RequestID string `json:"request_id"`
+	Choice    string `json:"choice"`
+}
+
 type DownloadJob struct {
 	RequestID    string
 	TrackID      string
@@ -21,6 +28,10 @@ type DownloadJob struct {
 	TrackNumber  int
 	Duration     int
 	ThumbnailURL string
+	// YouTubeURL, when set, marks this as a replacement job: the audio at this
+	// URL replaces the existing file for Track/Album/Artist while preserving
+	// the file's existing tags.
+	YouTubeURL string
 }
 
 // Track is a provider-neutral representation of a single song. It carries the

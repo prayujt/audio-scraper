@@ -10,6 +10,14 @@ type Choice struct {
 	Type  constants.EntityType `json:"type"`
 	ID    string               `json:"id"`
 	Label string               `json:"label"`
+
+	// The following are used by the replacement flow to carry song identity and
+	// the chosen YouTube candidate URL between steps.
+	Artist   string `json:"artist,omitempty"`
+	Album    string `json:"album,omitempty"`
+	Track    string `json:"track,omitempty"`
+	Duration int    `json:"duration,omitempty"`
+	URL      string `json:"url,omitempty"`
 }
 
 type Choices []Choice

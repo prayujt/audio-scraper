@@ -10,6 +10,8 @@ import (
 
 	"audio-scraper/internal/adapters/itunes"
 	"audio-scraper/internal/adapters/store"
+	"audio-scraper/internal/adapters/subsonic"
+	"audio-scraper/internal/adapters/youtube"
 	"audio-scraper/internal/constants"
 	"audio-scraper/internal/logger"
 	"audio-scraper/internal/models"
@@ -19,6 +21,8 @@ import (
 type Deps struct {
 	Log      logger.Logger
 	Metadata itunes.Provider
+	Subsonic subsonic.Provider
+	YouTube  youtube.Provider
 	Store    store.Provider
 	Queue    *pool.DownloadWorkerPool
 }
@@ -26,12 +30,21 @@ type Deps struct {
 type Handlers struct {
 	log      logger.Logger
 	metadata itunes.Provider
+	subsonic subsonic.Provider
+	youtube  youtube.Provider
 	store    store.Provider
 	queue    *pool.DownloadWorkerPool
 }
 
 func NewHandlers(deps *Deps) *Handlers {
-	return &Handlers{log: deps.Log, metadata: deps.Metadata, store: deps.Store, queue: deps.Queue}
+	return &Handlers{
+		log:      deps.Log,
+		metadata: deps.Metadata,
+		subsonic: deps.Subsonic,
+		youtube:  deps.YouTube,
+		store:    deps.Store,
+		queue:    deps.Queue,
+	}
 }
 
 func (h *Handlers) HealthHandler(w http.ResponseWriter, r *http.Request) {
@@ -83,6 +96,122 @@ func (h *Handlers) Search(w http.ResponseWriter, r *http.Request) {
 		RequestID: requestID,
 		Choices:   labels,
 	})
+}
+
+// LibrarySearch performs a partial search against the Subsonic library and
+// returns the matching songs as selectable choices (replacement flow, step 1).
+func (h *Handlers) LibrarySearch(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	requestID := uuid.New().String()
+	log := h.log.With("handler", "LibrarySearch", "request_id", requestID)
+
+	query := strings.TrimSpace(r.URL.Query().Get("q"))
+	if query == "" {
+		log.Warn("search query parameter 'q' is missing")
+		http.Error(w, "missing query parameter 'q'", http.StatusBadRequest)
+		return
+	}
+
+	res, err := h.subsonic.Search(logger.Into(ctx, log.With("query", query)), query)
+	if err != nil {
+		log.Error("subsonic search failed", "error", err)
+		http.Error(w, "subsonic search failed", http.StatusInternalServerError)
+		return
+	}
+
+	choices := songsToChoices(res.Songs)
+	h.store.Set(requestID, choices)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(models.SearchResponse{
+		RequestID: requestID,
+		Choices:   choiceLabels(choices),
+	})
+}
+
+// LibraryCandidates returns the ranked YouTube candidates for a previously
+// selected library song (replacement flow, step 2).
+func (h *Handlers) LibraryCandidates(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	log := h.log.With("handler", "LibraryCandidates")
+
+	var req models.ChoiceRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		log.Warn("invalid candidates request", "error", err)
+		http.Error(w, "Invalid request: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	log = log.With("request_id", req.RequestID)
+
+	data, found := h.store.Get(req.RequestID)
+	if !found {
+		http.Error(w, "Request ID not found", http.StatusBadRequest)
+		return
+	}
+	song := data.FindByLabel(req.Choice)
+	if song == nil {
+		http.Error(w, "Choice not found: "+req.Choice, http.StatusBadRequest)
+		return
+	}
+
+	cands, err := h.youtube.Candidates(logger.Into(ctx, log), song.Track, song.Artist, song.Duration)
+	if err != nil {
+		log.Error("youtube candidate search failed", "error", err)
+		http.Error(w, "youtube candidate search failed", http.StatusInternalServerError)
+		return
+	}
+
+	choices := candidatesToChoices(cands, song)
+	h.store.Set(req.RequestID, choices)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(models.SearchResponse{
+		RequestID: req.RequestID,
+		Choices:   choiceLabels(choices),
+	})
+}
+
+// Replace enqueues a replacement job for a chosen YouTube candidate
+// (replacement flow, step 3).
+func (h *Handlers) Replace(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	log := h.log.With("handler", "Replace")
+
+	var req models.ChoiceRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		log.Warn("invalid replace request", "error", err)
+		http.Error(w, "Invalid request: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	log = log.With("request_id", req.RequestID)
+
+	data, found := h.store.Get(req.RequestID)
+	if !found {
+		http.Error(w, "Request ID not found", http.StatusBadRequest)
+		return
+	}
+	c := data.FindByLabel(req.Choice)
+	if c == nil {
+		http.Error(w, "Choice not found: "+req.Choice, http.StatusBadRequest)
+		return
+	}
+
+	job := models.DownloadJob{
+		RequestID:  req.RequestID,
+		Track:      c.Track,
+		Album:      c.Album,
+		Artist:     c.Artist,
+		Duration:   c.Duration,
+		YouTubeURL: c.URL,
+	}
+	if err := h.queue.Enqueue(ctx, job); err != nil {
+		log.Error("failed to enqueue replacement", "error", err)
+		http.Error(w, "failed to enqueue replacement", http.StatusInternalServerError)
+		return
+	}
+
+	log.Info("replacement queued", "track", c.Track, "url", c.URL)
+	w.WriteHeader(http.StatusAccepted)
 }
 
 func (h *Handlers) Download(w http.ResponseWriter, r *http.Request) {

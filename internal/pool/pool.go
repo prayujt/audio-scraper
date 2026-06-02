@@ -119,6 +119,24 @@ func (p *DownloadWorkerPool) worker(id int) {
 
 			log := log.With("request_id", job.RequestID, "track_id", job.TrackID)
 
+			// Replacement job: swap audio for an existing file, preserving tags.
+			if job.YouTubeURL != "" {
+				rlog := log.With("youtube_url", job.YouTubeURL, "track", job.Track)
+				rlog.Info("processing replacement job")
+				j := job
+				err := p.fs.ReplaceAudio(logger.Into(ctx, rlog), &j, func(ctx context.Context, dest string) error {
+					_, derr := p.yt.Download(ctx, dest, j.YouTubeURL)
+					return derr
+				})
+				if err != nil {
+					rlog.Error("replacement failed", "error", err)
+					continue
+				}
+				p.dirty.Store(true)
+				rlog.Info("replacement job completed successfully")
+				continue
+			}
+
 			log.Info("processing download job")
 
 			videoURL, err := p.yt.Search(logger.Into(ctx, log), job.Track, job.Artist, job.Duration)

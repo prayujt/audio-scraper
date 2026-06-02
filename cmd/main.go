@@ -59,6 +59,8 @@ func main() {
 	h := api.NewHandlers(&api.Deps{
 		Log:      log,
 		Metadata: md,
+		Subsonic: ss,
+		YouTube:  yt,
 		Store:    st,
 		Queue:    q,
 	})
@@ -66,6 +68,9 @@ func main() {
 	router.HandleFunc("/", h.HealthHandler).Methods("GET")
 	router.HandleFunc("/search", h.Search).Methods("GET")
 	router.HandleFunc("/download", h.Download).Methods("POST")
+	router.HandleFunc("/library/search", h.LibrarySearch).Methods("GET")
+	router.HandleFunc("/library/candidates", h.LibraryCandidates).Methods("POST")
+	router.HandleFunc("/replace", h.Replace).Methods("POST")
 
 	server := &http.Server{
 		Handler:      router,
