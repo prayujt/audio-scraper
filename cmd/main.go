@@ -13,6 +13,7 @@ import (
 	filesystemimpl "audio-scraper/internal/adapters/filesystem/impl"
 	itunesimpl "audio-scraper/internal/adapters/itunes/impl"
 	lrclibimpl "audio-scraper/internal/adapters/lrclib/impl"
+	spotifyimpl "audio-scraper/internal/adapters/spotify/impl"
 	storeimpl "audio-scraper/internal/adapters/store/impl"
 	subsonicimpl "audio-scraper/internal/adapters/subsonic/impl"
 	youtubeimpl "audio-scraper/internal/adapters/youtube/impl"
@@ -37,6 +38,7 @@ func main() {
 	st := storeimpl.New(log)
 	yt := youtubeimpl.New()
 	lrc := lrclibimpl.New()
+	sp := spotifyimpl.New()
 	ss := subsonicimpl.New(cfg.SubsonicURL, cfg.SubsonicUser, cfg.SubsonicPassword)
 	// Verify Subsonic credentials up front. When no URL is configured this
 	// warns and returns nil; when one is, a failure is fatal.
@@ -60,6 +62,7 @@ func main() {
 		Log:      log,
 		Metadata: md,
 		Subsonic: ss,
+		Spotify:  sp,
 		YouTube:  yt,
 		Store:    st,
 		Queue:    q,
@@ -71,6 +74,7 @@ func main() {
 	router.HandleFunc("/library/search", h.LibrarySearch).Methods("GET")
 	router.HandleFunc("/library/candidates", h.LibraryCandidates).Methods("POST")
 	router.HandleFunc("/replace", h.Replace).Methods("POST")
+	router.HandleFunc("/import", h.Import).Methods("POST")
 
 	server := &http.Server{
 		Handler:      router,

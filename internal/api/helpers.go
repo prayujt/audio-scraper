@@ -134,6 +134,7 @@ func trackToJob(requestID string, t models.Track) models.DownloadJob {
 		Track:        t.Name,
 		Album:        t.Album,
 		Artist:       t.Artist,
+		AlbumArtist:  t.AlbumArtist,
 		ReleaseDate:  t.ReleaseDate,
 		TrackNumber:  t.TrackNumber,
 		Duration:     t.Duration,

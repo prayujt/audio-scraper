@@ -2,6 +2,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -9,6 +10,7 @@ import (
 	"github.com/google/uuid"
 
 	"audio-scraper/internal/adapters/itunes"
+	"audio-scraper/internal/adapters/spotify"
 	"audio-scraper/internal/adapters/store"
 	"audio-scraper/internal/adapters/subsonic"
 	"audio-scraper/internal/adapters/youtube"
@@ -22,6 +24,7 @@ type Deps struct {
 	Log      logger.Logger
 	Metadata itunes.Provider
 	Subsonic subsonic.Provider
+	Spotify  spotify.Provider
 	YouTube  youtube.Provider
 	Store    store.Provider
 	Queue    *pool.DownloadWorkerPool
@@ -31,6 +34,7 @@ type Handlers struct {
 	log      logger.Logger
 	metadata itunes.Provider
 	subsonic subsonic.Provider
+	spotify  spotify.Provider
 	youtube  youtube.Provider
 	store    store.Provider
 	queue    *pool.DownloadWorkerPool
@@ -41,6 +45,7 @@ func NewHandlers(deps *Deps) *Handlers {
 		log:      deps.Log,
 		metadata: deps.Metadata,
 		subsonic: deps.Subsonic,
+		spotify:  deps.Spotify,
 		youtube:  deps.YouTube,
 		store:    deps.Store,
 		queue:    deps.Queue,
@@ -271,4 +276,104 @@ func (h *Handlers) Download(w http.ResponseWriter, r *http.Request) {
 	}(log, reqID, resolved)
 
 	w.WriteHeader(http.StatusAccepted)
+}
+
+// ImportRequest is the body of a playlist-import request.
+type ImportRequest struct {
+	PlaylistURL string `json:"playlist_url"`
+}
+
+// ImportResponse summarizes an accepted import.
+type ImportResponse struct {
+	Name       string `json:"name"`
+	PlaylistID string `json:"playlist_id"`
+	Queued     int    `json:"queued"`
+}
+
+// Import fetches a Spotify playlist, creates a matching Subsonic playlist (if
+// one with that name doesn't already exist), and asynchronously downloads the
+// first iTunes match for each track, tagging each job with the playlist ID so
+// the pool adds it to the playlist once indexed.
+func (h *Handlers) Import(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	requestID := uuid.New().String()
+	log := h.log.With("handler", "Import", "request_id", requestID)
+
+	var req ImportRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		log.Warn("invalid import request", "error", err)
+		http.Error(w, "Invalid request: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	req.PlaylistURL = strings.TrimSpace(req.PlaylistURL)
+	if req.PlaylistURL == "" {
+		log.Warn("missing playlist_url")
+		http.Error(w, "missing playlist_url", http.StatusBadRequest)
+		return
+	}
+
+	pl, err := h.spotify.FetchPlaylist(logger.Into(ctx, log), req.PlaylistURL)
+	if err != nil {
+		log.Error("spotify fetch failed", "error", err)
+		http.Error(w, "failed to fetch spotify playlist", http.StatusBadGateway)
+		return
+	}
+	log = log.With("playlist", pl.Name)
+
+	existing, err := h.subsonic.GetPlaylists(logger.Into(ctx, log))
+	if err != nil {
+		log.Error("failed to list playlists", "error", err)
+		http.Error(w, "failed to list playlists", http.StatusInternalServerError)
+		return
+	}
+	for _, e := range existing {
+		if strings.EqualFold(strings.TrimSpace(e.Name), pl.Name) {
+			log.Warn("playlist already exists")
+			http.Error(w, "playlist already exists", http.StatusConflict)
+			return
+		}
+	}
+
+	created, err := h.subsonic.CreatePlaylist(logger.Into(ctx, log), pl.Name, nil)
+	if err != nil {
+		log.Error("failed to create playlist", "error", err)
+		http.Error(w, "failed to create playlist", http.StatusInternalServerError)
+		return
+	}
+	log = log.With("playlist_id", created.ID)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusAccepted)
+	json.NewEncoder(w).Encode(ImportResponse{
+		Name:       pl.Name,
+		PlaylistID: created.ID,
+		Queued:     len(pl.Tracks),
+	})
+
+	go func(log logger.Logger, reqID, playlistID string, tracks []spotify.Track) {
+		for _, t := range tracks {
+			tlog := log.With("track", t.Title, "artist", t.Artist)
+			results, err := h.metadata.Search(logger.Into(context.Background(), tlog), t.Title+" "+t.Artist)
+			if err != nil {
+				tlog.Warn("itunes search failed", "error", err)
+				continue
+			}
+			if len(results.Tracks) == 0 {
+				tlog.Warn("no itunes match, skipping track")
+				continue
+			}
+			track, err := h.metadata.GetTrack(logger.Into(context.Background(), tlog), results.Tracks[0].ID)
+			if err != nil {
+				tlog.Warn("failed to fetch itunes track", "error", err)
+				continue
+			}
+			job := trackToJob(reqID, track)
+			job.PlaylistID = playlistID
+			if err := h.queue.Enqueue(context.Background(), job); err != nil {
+				tlog.Error("failed to enqueue track", "error", err)
+				continue
+			}
+			tlog.Info("queued track for playlist import")
+		}
+	}(log, requestID, created.ID, pl.Tracks)
 }

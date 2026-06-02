@@ -24,6 +24,7 @@ type DownloadJob struct {
 	Track        string
 	Album        string
 	Artist       string
+	AlbumArtist  string
 	ReleaseDate  string
 	TrackNumber  int
 	Duration     int
@@ -32,15 +33,25 @@ type DownloadJob struct {
 	// URL replaces the existing file for Track/Album/Artist while preserving
 	// the file's existing tags.
 	YouTubeURL string
+	// PlaylistID, when set, names the Subsonic playlist this track should be
+	// added to once it has downloaded and been indexed by Navidrome. Because a
+	// freshly downloaded file is not addressable until a rescan assigns it an
+	// ID, membership is resolved asynchronously by the pool's scanner.
+	PlaylistID string
 }
 
 // Track is a provider-neutral representation of a single song. It carries the
 // flat set of fields required to build a DownloadJob.
 type Track struct {
-	ID          string
-	Name        string
-	Album       string
-	Artist      string
+	ID     string
+	Name   string
+	Album  string
+	Artist string
+	// AlbumArtist is the artist credited for the album as a whole. It defaults
+	// to Artist for loose tracks and is set to the album's collection artist
+	// when the track is resolved via GetAlbum, so multi-artist albums (e.g.
+	// cast recordings) tag a consistent album artist and group as one album.
+	AlbumArtist string
 	ReleaseDate string
 	TrackNumber int
 	Duration    int

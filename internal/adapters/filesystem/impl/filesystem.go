@@ -165,6 +165,15 @@ func (f *Client) TagFile(ctx context.Context, filePath string, job *models.Downl
 	tag.SetArtist(job.Artist)
 	tag.SetAlbum(job.Album)
 
+	// Write the album artist (TPE2). Navidrome groups tracks into an album by
+	// album name + album artist, so a consistent TPE2 keeps multi-artist
+	// albums (cast recordings, soundtracks) from splitting per track artist.
+	albumArtist := job.AlbumArtist
+	if albumArtist == "" {
+		albumArtist = job.Artist
+	}
+	tag.AddTextFrame("TPE2", tag.DefaultEncoding(), albumArtist)
+
 	lyrics, err := f.lrc.FindLyrics(ctx, &lrclib.LrclibRequest{
 		Artist:   job.Artist,
 		Album:    job.Album,
