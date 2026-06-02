@@ -9,15 +9,15 @@ import (
 
 	"github.com/gorilla/mux"
 
+	filesystemimpl "audio-scraper/internal/adapters/filesystem/impl"
+	itunesimpl "audio-scraper/internal/adapters/itunes/impl"
+	lrclibimpl "audio-scraper/internal/adapters/lrclib/impl"
+	storeimpl "audio-scraper/internal/adapters/store/impl"
+	youtubeimpl "audio-scraper/internal/adapters/youtube/impl"
 	"audio-scraper/internal/api"
 	"audio-scraper/internal/constants"
 	"audio-scraper/internal/logger"
 	"audio-scraper/internal/pool"
-	"audio-scraper/internal/providers/filesystem"
-	"audio-scraper/internal/providers/lrclib"
-	"audio-scraper/internal/providers/spotify"
-	"audio-scraper/internal/providers/store"
-	"audio-scraper/internal/providers/youtube"
 )
 
 func main() {
@@ -29,15 +29,11 @@ func main() {
 	}
 	log.Info("started server", "host", "0.0.0.0", "port", port)
 
-	sp, err := spotify.NewSpotifyProvider(os.Getenv("SPOTIFY_CLIENT_ID"), os.Getenv("SPOTIFY_CLIENT_SECRET"))
-	if err != nil {
-		log.Error("failed to initialize Spotify provider", "error", err)
-		return
-	}
-	st := store.NewStoreProvider(log)
-	yt := youtube.NewYTProvider()
-	lrc := lrclib.NewLrclibProvider()
-	fs, err := filesystem.NewFSProvider(os.Getenv("MUSIC_HOME"), lrc)
+	md := itunesimpl.New()
+	st := storeimpl.New(log)
+	yt := youtubeimpl.New()
+	lrc := lrclibimpl.New()
+	fs, err := filesystemimpl.New(os.Getenv("MUSIC_HOME"), lrc)
 	if err != nil {
 		log.Error("failed to initialize filesystem provider", "error", err)
 		return
@@ -54,10 +50,10 @@ func main() {
 		FS:  fs,
 	})
 	h := api.NewHandlers(&api.Deps{
-		Log:     log,
-		Spotify: sp,
-		Store:   st,
-		Queue:   q,
+		Log:      log,
+		Metadata: md,
+		Store:    st,
+		Queue:    q,
 	})
 	router := mux.NewRouter()
 	router.HandleFunc("/", h.HealthHandler).Methods("GET")

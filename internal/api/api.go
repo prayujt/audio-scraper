@@ -7,32 +7,31 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	spotifypkg "github.com/zmb3/spotify/v2"
 
+	"audio-scraper/internal/adapters/itunes"
+	"audio-scraper/internal/adapters/store"
 	"audio-scraper/internal/constants"
 	"audio-scraper/internal/logger"
 	"audio-scraper/internal/models"
 	"audio-scraper/internal/pool"
-	"audio-scraper/internal/providers/spotify"
-	"audio-scraper/internal/providers/store"
 )
 
 type Deps struct {
-	Log     logger.Logger
-	Spotify *spotify.SpotifyClient
-	Store   *store.Store
-	Queue   *pool.DownloadWorkerPool
+	Log      logger.Logger
+	Metadata itunes.Provider
+	Store    store.Provider
+	Queue    *pool.DownloadWorkerPool
 }
 
 type Handlers struct {
-	log     logger.Logger
-	spotify *spotify.SpotifyClient
-	store   *store.Store
-	queue   *pool.DownloadWorkerPool
+	log      logger.Logger
+	metadata itunes.Provider
+	store    store.Provider
+	queue    *pool.DownloadWorkerPool
 }
 
 func NewHandlers(deps *Deps) *Handlers {
-	return &Handlers{log: deps.Log, spotify: deps.Spotify, store: deps.Store, queue: deps.Queue}
+	return &Handlers{log: deps.Log, metadata: deps.Metadata, store: deps.Store, queue: deps.Queue}
 }
 
 func (h *Handlers) HealthHandler(w http.ResponseWriter, r *http.Request) {
@@ -61,20 +60,14 @@ func (h *Handlers) Search(w http.ResponseWriter, r *http.Request) {
 		}
 
 		log := log.With("query", query)
-		results, err := h.spotify.Search(logger.Into(ctx, log), query, spotifypkg.SearchTypeArtist|spotifypkg.SearchTypeAlbum|spotifypkg.SearchTypeTrack)
+		results, err := h.metadata.Search(logger.Into(ctx, log), query)
 		if err != nil {
-			log.Error("spotify search failed", "error", err)
-			http.Error(w, "spotify search failed", http.StatusInternalServerError)
+			log.Error("metadata search failed", "error", err)
+			http.Error(w, "metadata search failed", http.StatusInternalServerError)
 			return
 		}
 
-		choices, err := processSearchData(results, log)
-		if err != nil {
-			log.Error("processing search data failed", "error", err)
-			http.Error(w, "processing search data failed", http.StatusInternalServerError)
-			return
-		}
-
+		choices := processSearchData(results, log)
 		allChoices = append(allChoices, choices...)
 	}
 
@@ -130,18 +123,18 @@ func (h *Handlers) Download(w http.ResponseWriter, r *http.Request) {
 			clog.Info("processing choice")
 
 			deps := addToQueueDeps{
-				log: clog,
-				sp:  h.spotify,
-				q:   h.queue,
+				log:      clog,
+				metadata: h.metadata,
+				q:        h.queue,
 			}
 
 			switch c.Type {
-			case constants.SpotifyEntityTypeTrack:
-				addTrackToQueue(deps, reqID, spotifypkg.ID(c.ID))
-			case constants.SpotifyEntityTypeAlbum:
-				addAlbumToQueue(deps, reqID, spotifypkg.ID(c.ID))
-			case constants.SpotifyEntityTypeArtist:
-				addArtistToQueue(deps, reqID, spotifypkg.ID(c.ID))
+			case constants.EntityTypeTrack:
+				addTrackToQueue(deps, reqID, c.ID)
+			case constants.EntityTypeAlbum:
+				addAlbumToQueue(deps, reqID, c.ID)
+			case constants.EntityTypeArtist:
+				addArtistToQueue(deps, reqID, c.ID)
 			default:
 				clog.Warn("unknown choice type", "type", c.Type)
 			}
