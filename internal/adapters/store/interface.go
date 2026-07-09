@@ -11,13 +11,17 @@ type Choice struct {
 	ID    string               `json:"id"`
 	Label string               `json:"label"`
 
-	// The following are used by the replacement flow to carry song identity and
-	// the chosen YouTube candidate URL between steps.
-	Artist   string `json:"artist,omitempty"`
-	Album    string `json:"album,omitempty"`
-	Track    string `json:"track,omitempty"`
-	Duration int    `json:"duration,omitempty"`
-	URL      string `json:"url,omitempty"`
+	// The following carry song identity and metadata between multi-step flows
+	// (replacement and curated download).
+	Artist       string `json:"artist,omitempty"`
+	Album        string `json:"album,omitempty"`
+	Track        string `json:"track,omitempty"`
+	AlbumArtist  string `json:"album_artist,omitempty"`
+	ReleaseDate  string `json:"release_date,omitempty"`
+	TrackNumber  int    `json:"track_number,omitempty"`
+	ThumbnailURL string `json:"thumbnail_url,omitempty"`
+	Duration     int    `json:"duration,omitempty"`
+	URL          string `json:"url,omitempty"`
 }
 
 type Choices []Choice

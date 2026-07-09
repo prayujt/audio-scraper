@@ -208,6 +208,7 @@ func (h *Handlers) Replace(w http.ResponseWriter, r *http.Request) {
 		Artist:     c.Artist,
 		Duration:   c.Duration,
 		YouTubeURL: c.URL,
+		Replace:    true,
 	}
 	if err := h.queue.Enqueue(ctx, job); err != nil {
 		log.Error("failed to enqueue replacement", "error", err)
@@ -216,6 +217,109 @@ func (h *Handlers) Replace(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Info("replacement queued", "track", c.Track, "url", c.URL)
+	w.WriteHeader(http.StatusAccepted)
+}
+
+// CuratedCandidates returns ranked YouTube candidates for an iTunes track
+// selected from a previous /search (curated flow, step 2).
+func (h *Handlers) CuratedCandidates(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	log := h.log.With("handler", "CuratedCandidates")
+
+	var req models.ChoiceRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		log.Warn("invalid request", "error", err)
+		http.Error(w, "Invalid request: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	log = log.With("request_id", req.RequestID)
+
+	data, found := h.store.Get(req.RequestID)
+	if !found {
+		http.Error(w, "Request ID not found", http.StatusBadRequest)
+		return
+	}
+	c := data.FindByLabel(req.Choice)
+	if c == nil {
+		http.Error(w, "Choice not found: "+req.Choice, http.StatusBadRequest)
+		return
+	}
+	if c.Type != constants.EntityTypeTrack {
+		http.Error(w, "only track selections are supported", http.StatusBadRequest)
+		return
+	}
+
+	track, err := h.metadata.GetTrack(logger.Into(ctx, log), c.ID)
+	if err != nil {
+		log.Error("metadata track fetch failed", "error", err)
+		http.Error(w, "metadata track fetch failed", http.StatusInternalServerError)
+		return
+	}
+
+	cands, err := h.youtube.Candidates(logger.Into(ctx, log), track.Name, track.Artist, track.Duration)
+	if err != nil {
+		log.Error("youtube candidate search failed", "error", err)
+		http.Error(w, "youtube candidate search failed", http.StatusInternalServerError)
+		return
+	}
+
+	newRequestID := uuid.New().String()
+	choices := curatedCandidatesToChoices(cands, track)
+	h.store.Set(newRequestID, choices)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(models.SearchResponse{
+		RequestID: newRequestID,
+		Choices:   choiceLabels(choices),
+	})
+}
+
+// CuratedDownload enqueues a download job for a YouTube candidate chosen via
+// the curated flow (step 3). The job carries full iTunes metadata and a
+// pre-selected YouTubeURL so the pool skips its automatic search.
+func (h *Handlers) CuratedDownload(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	log := h.log.With("handler", "CuratedDownload")
+
+	var req models.ChoiceRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		log.Warn("invalid request", "error", err)
+		http.Error(w, "Invalid request: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	log = log.With("request_id", req.RequestID)
+
+	data, found := h.store.Get(req.RequestID)
+	if !found {
+		http.Error(w, "Request ID not found", http.StatusBadRequest)
+		return
+	}
+	c := data.FindByLabel(req.Choice)
+	if c == nil {
+		http.Error(w, "Choice not found: "+req.Choice, http.StatusBadRequest)
+		return
+	}
+
+	job := models.DownloadJob{
+		RequestID:    req.RequestID,
+		TrackID:      c.ID,
+		Track:        c.Track,
+		Album:        c.Album,
+		Artist:       c.Artist,
+		AlbumArtist:  c.AlbumArtist,
+		ReleaseDate:  c.ReleaseDate,
+		TrackNumber:  c.TrackNumber,
+		Duration:     c.Duration,
+		ThumbnailURL: c.ThumbnailURL,
+		YouTubeURL:   c.URL,
+	}
+	if err := h.queue.Enqueue(ctx, job); err != nil {
+		log.Error("failed to enqueue curated download", "error", err)
+		http.Error(w, "failed to enqueue download", http.StatusInternalServerError)
+		return
+	}
+
+	log.Info("curated download queued", "track", c.Track, "url", c.URL)
 	w.WriteHeader(http.StatusAccepted)
 }
 

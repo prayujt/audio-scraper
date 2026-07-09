@@ -74,6 +74,8 @@ func main() {
 	router.HandleFunc("/library/search", h.LibrarySearch).Methods("GET")
 	router.HandleFunc("/library/candidates", h.LibraryCandidates).Methods("POST")
 	router.HandleFunc("/replace", h.Replace).Methods("POST")
+	router.HandleFunc("/curated/candidates", h.CuratedCandidates).Methods("POST")
+	router.HandleFunc("/curated/download", h.CuratedDownload).Methods("POST")
 	router.HandleFunc("/import", h.Import).Methods("POST")
 
 	server := &http.Server{

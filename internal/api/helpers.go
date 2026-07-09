@@ -67,6 +67,30 @@ func fmtDuration(sec int) string {
 	return fmt.Sprintf("%d:%02d", sec/60, sec%60)
 }
 
+// curatedCandidatesToChoices turns YouTube candidates into selectable choices,
+// carrying full iTunes metadata so the curated download step can build a
+// complete DownloadJob without re-fetching.
+func curatedCandidatesToChoices(cands []youtube.Candidate, track models.Track) []store.Choice {
+	var choices []store.Choice
+	for _, c := range cands {
+		choices = append(choices, store.Choice{
+			Type:         constants.EntityTypeCandidate,
+			ID:           track.ID,
+			Label:        fmt.Sprintf("%s — %s (%s)", c.Title, c.Uploader, fmtDuration(c.Duration)),
+			URL:          c.URL,
+			Artist:       track.Artist,
+			Album:        track.Album,
+			Track:        track.Name,
+			AlbumArtist:  track.AlbumArtist,
+			ReleaseDate:  track.ReleaseDate,
+			TrackNumber:  track.TrackNumber,
+			ThumbnailURL: track.ArtworkURL,
+			Duration:     track.Duration,
+		})
+	}
+	return choices
+}
+
 func processSearchData(result models.SearchResult, log logger.Logger) []store.Choice {
 	trackCount := 10
 	albumCount := 5

@@ -29,10 +29,13 @@ type DownloadJob struct {
 	TrackNumber  int
 	Duration     int
 	ThumbnailURL string
-	// YouTubeURL, when set, marks this as a replacement job: the audio at this
-	// URL replaces the existing file for Track/Album/Artist while preserving
-	// the file's existing tags.
+	// YouTubeURL, when set, supplies the video URL to download instead of
+	// running an automatic YouTube search.
 	YouTubeURL string
+	// Replace marks this as a replacement job: the audio at YouTubeURL
+	// replaces the existing file for Track/Album/Artist while preserving
+	// the file's existing tags.
+	Replace bool
 	// PlaylistID, when set, names the Subsonic playlist this track should be
 	// added to once it has downloaded and been indexed by Navidrome. Because a
 	// freshly downloaded file is not addressable until a rescan assigns it an
