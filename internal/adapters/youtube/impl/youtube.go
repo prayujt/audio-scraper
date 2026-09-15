@@ -19,17 +19,29 @@ import (
 	"audio-scraper/internal/logger"
 )
 
-// searchResults is how many candidates ytsearch returns for ranking.
-const searchResults = 8
+const (
+	defaultCandidateLimit = 25
+	maxCandidateLimit     = 50
+)
 
 // Client is the YouTube-backed audio provider.
-type Client struct{}
+type Client struct {
+	candidateLimit int
+}
 
 var _ youtube.Provider = (*Client)(nil)
 
-// New returns a YouTube audio provider.
-func New() *Client {
-	return &Client{}
+// New returns a YouTube audio provider. The configured candidate limit is
+// clamped so a bad deployment value cannot turn a normal search into an
+// unbounded yt-dlp request.
+func New(candidateLimit int) *Client {
+	if candidateLimit < 1 {
+		candidateLimit = defaultCandidateLimit
+	}
+	if candidateLimit > maxCandidateLimit {
+		candidateLimit = maxCandidateLimit
+	}
+	return &Client{candidateLimit: candidateLimit}
 }
 
 // ytEntry is a single ytsearch result (flat-playlist mode).
@@ -72,7 +84,7 @@ func (y *Client) Candidates(ctx context.Context, track, artist string, duration 
 		"--no-warnings",
 		"--flat-playlist",
 		"-J",
-		fmt.Sprintf("ytsearch%d:%s", searchResults, query),
+		fmt.Sprintf("ytsearch%d:%s", y.candidateLimit, query),
 	)
 	out, err := cmd.Output()
 	if err != nil {

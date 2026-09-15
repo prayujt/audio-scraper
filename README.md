@@ -28,6 +28,7 @@ This keeps the API fast and responsive while downloads happen asynchronously.
 | **SPOTIFY_CLIENT_ID** | Spotify API client ID. |
 | **SPOTIFY_CLIENT_SECRET** | Spotify API client secret. |
 | **WORKER_SIZE** | Number of worker goroutines processing download jobs. (optional, defaults to 5) |
+| **YOUTUBE_CANDIDATE_LIMIT** | Number of YouTube results ranked and shown for manual source selection. (optional, defaults to 25; maximum 50) |
 | **MUSIC_HOME** | Directory where music files are saved (**no trailing slash**). |
 
 Example:
@@ -37,6 +38,7 @@ export API_PORT=8080
 export SPOTIFY_CLIENT_ID=your_id
 export SPOTIFY_CLIENT_SECRET=your_secret
 export WORKER_SIZE=5
+export YOUTUBE_CANDIDATE_LIMIT=25
 export MUSIC_HOME=/music
 ```
 

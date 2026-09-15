@@ -36,7 +36,7 @@ func main() {
 
 	md := itunesimpl.New()
 	st := storeimpl.New(log)
-	yt := youtubeimpl.New()
+	yt := youtubeimpl.New(cfg.YouTubeCandidateLimit)
 	lrc := lrclibimpl.New()
 	sp := spotifyimpl.New()
 	ss := subsonicimpl.New(cfg.SubsonicURL, cfg.SubsonicUser, cfg.SubsonicPassword)
