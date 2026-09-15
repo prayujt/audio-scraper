@@ -10,6 +10,9 @@ type Config struct {
 	APIPort    string `env:"API_PORT" envDefault:"8080"`
 	MusicHome  string `env:"MUSIC_HOME"`
 	WorkerSize int    `env:"WORKER_SIZE" envDefault:"5"`
+	// YouTubeCandidateLimit controls how many yt-dlp search results are ranked
+	// and exposed for a manual source selection.
+	YouTubeCandidateLimit int `env:"YOUTUBE_CANDIDATE_LIMIT" envDefault:"25"`
 
 	// SubsonicURL is the base URL of a Subsonic-compatible server (Navidrome).
 	// When empty, all Subsonic operations are skipped.
