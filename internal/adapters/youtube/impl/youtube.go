@@ -12,9 +12,11 @@ import (
 	"os/exec"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/faiface/beep/mp3"
 
+	"audio-scraper/internal/adapters/jev"
 	"audio-scraper/internal/adapters/youtube"
 	"audio-scraper/internal/logger"
 )
@@ -27,6 +29,7 @@ const (
 // Client is the YouTube-backed audio provider.
 type Client struct {
 	candidateLimit int
+	ranker         jev.Ranker
 }
 
 var _ youtube.Provider = (*Client)(nil)
@@ -34,14 +37,18 @@ var _ youtube.Provider = (*Client)(nil)
 // New returns a YouTube audio provider. The configured candidate limit is
 // clamped so a bad deployment value cannot turn a normal search into an
 // unbounded yt-dlp request.
-func New(candidateLimit int) *Client {
+func New(candidateLimit int, rankers ...jev.Ranker) *Client {
 	if candidateLimit < 1 {
 		candidateLimit = defaultCandidateLimit
 	}
 	if candidateLimit > maxCandidateLimit {
 		candidateLimit = maxCandidateLimit
 	}
-	return &Client{candidateLimit: candidateLimit}
+	var ranker jev.Ranker
+	if len(rankers) > 0 {
+		ranker = rankers[0]
+	}
+	return &Client{candidateLimit: candidateLimit, ranker: ranker}
 }
 
 // ytEntry is a single ytsearch result (flat-playlist mode).
@@ -119,14 +126,65 @@ func (y *Client) Candidates(ctx context.Context, track, artist string, duration 
 		if uploader == "" {
 			uploader = r.entry.Channel
 		}
-		candidates = append(candidates, youtube.Candidate{
-			URL:      "https://www.youtube.com/watch?v=" + r.entry.ID,
-			Title:    r.entry.Title,
-			Uploader: uploader,
-			Duration: int(r.entry.Duration),
-		})
+		candidates = append(candidates, youtube.Candidate{URL: "https://www.youtube.com/watch?v=" + r.entry.ID, Title: r.entry.Title, Uploader: uploader, Duration: int(r.entry.Duration)})
 	}
-	return candidates, nil
+	return y.rankWithJev(ctx, log, track, artist, duration, candidates), nil
+}
+
+// rankWithJev only reorders candidates that pass conservative deterministic
+// checks. Any timeout, low-confidence answer, or unsafe set preserves the
+// existing heuristic ordering and never blocks downloads.
+func (y *Client) rankWithJev(ctx context.Context, log logger.Logger, track, artist string, duration int, candidates []youtube.Candidate) []youtube.Candidate {
+	if y.ranker == nil || len(candidates) < 2 {
+		return candidates
+	}
+	eligible := make([]jev.Candidate, 0, len(candidates))
+	indices := make(map[string]int)
+	for i, candidate := range candidates {
+		if !safeForJev(track, artist, duration, candidate) {
+			continue
+		}
+		key := fmt.Sprintf("candidate_%d", i)
+		eligible = append(eligible, jev.Candidate{Key: key, Title: candidate.Title, Uploader: candidate.Uploader, Duration: candidate.Duration})
+		indices[key] = i
+	}
+	if len(eligible) < 2 {
+		return candidates
+	}
+	decisionCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	key, confidence, err := y.ranker.Rank(decisionCtx, track, artist, duration, eligible)
+	if err != nil {
+		log.Info("Jev candidate ranking fallback", "eligible", len(eligible), "error", err)
+		return candidates
+	}
+	i := indices[key]
+	selected := candidates[i]
+	ordered := make([]youtube.Candidate, 0, len(candidates))
+	ordered = append(ordered, selected)
+	for j, candidate := range candidates {
+		if j != i {
+			ordered = append(ordered, candidate)
+		}
+	}
+	log.Info("Jev candidate ranking selected", "candidate", selected.URL, "confidence", confidence, "eligible", len(eligible))
+	return ordered
+}
+
+func safeForJev(track, artist string, expectedDuration int, candidate youtube.Candidate) bool {
+	haystack := normalize(candidate.Title + " " + candidate.Uploader)
+	for _, banned := range []string{" cover ", " karaoke ", " live ", " remix ", " slowed ", " reverb ", " sped up ", " loop ", " reaction ", " instrumental ", " piano ", " arrangement ", " tribute "} {
+		if strings.Contains(" "+haystack+" ", banned) {
+			return false
+		}
+	}
+	if expectedDuration > 0 && candidate.Duration > 0 {
+		tolerance := int(math.Max(5, math.Ceil(float64(expectedDuration)*0.03)))
+		if int(math.Abs(float64(candidate.Duration-expectedDuration))) > tolerance {
+			return false
+		}
+	}
+	return normalize(track) != "" && normalize(artist) != ""
 }
 
 // score rates how well a search result matches the desired track. Higher is

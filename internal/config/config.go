@@ -13,6 +13,13 @@ type Config struct {
 	// YouTubeCandidateLimit controls how many yt-dlp search results are ranked
 	// and exposed for a manual source selection.
 	YouTubeCandidateLimit int `env:"YOUTUBE_CANDIDATE_LIMIT" envDefault:"25"`
+	// Jev candidate ranking is optional and only re-ranks candidates that have
+	// already passed deterministic safety filters; it never authorizes downloads.
+	JevCandidateRankingEnabled bool    `env:"JEV_CANDIDATE_RANKING_ENABLED" envDefault:"false"`
+	JevAPIKey                  string  `env:"TYPESAFE_API_KEY"`
+	JevEndpoint                string  `env:"JEV_ENDPOINT" envDefault:"https://api.typesafe.ai/v1/systemone"`
+	JevModel                   string  `env:"JEV_MODEL" envDefault:"jev-latest"`
+	JevMinConfidence           float64 `env:"JEV_MIN_CONFIDENCE" envDefault:"0.80"`
 
 	// SubsonicURL is the base URL of a Subsonic-compatible server (Navidrome).
 	// When empty, all Subsonic operations are skipped.
