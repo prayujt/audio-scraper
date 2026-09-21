@@ -12,6 +12,7 @@ import (
 
 	filesystemimpl "audio-scraper/internal/adapters/filesystem/impl"
 	itunesimpl "audio-scraper/internal/adapters/itunes/impl"
+	jevimpl "audio-scraper/internal/adapters/jev/impl"
 	lrclibimpl "audio-scraper/internal/adapters/lrclib/impl"
 	spotifyimpl "audio-scraper/internal/adapters/spotify/impl"
 	storeimpl "audio-scraper/internal/adapters/store/impl"
@@ -36,7 +37,12 @@ func main() {
 
 	md := itunesimpl.New()
 	st := storeimpl.New(log)
-	yt := youtubeimpl.New(cfg.YouTubeCandidateLimit)
+	var jevRanker *jevimpl.Client
+	if cfg.JevCandidateRankingEnabled {
+		jevRanker = jevimpl.New(cfg.JevAPIKey, cfg.JevEndpoint, cfg.JevModel, cfg.JevMinConfidence)
+		log.Info("Jev candidate ranking enabled", "model", cfg.JevModel, "min_confidence", cfg.JevMinConfidence)
+	}
+	yt := youtubeimpl.New(cfg.YouTubeCandidateLimit, jevRanker)
 	lrc := lrclibimpl.New()
 	sp := spotifyimpl.New()
 	ss := subsonicimpl.New(cfg.SubsonicURL, cfg.SubsonicUser, cfg.SubsonicPassword)
