@@ -65,3 +65,20 @@ Accepts one or more selected tracks and queues them for background downloading.
 Each job is placed into a worker queue and processed by a goroutine pool.
 
 ---
+
+## Container builds
+
+Go images are built with ko v0.19.1 using the Go version in `go.mod`.
+CI saves Go modules and compiler outputs between commits. Image repositories,
+tags, target architectures, and deployment triggers are preserved.
+
+`Dockerfile.runtime` supplies the OS dependencies; ko compiles and packages the
+Go binary on top. To build locally with Docker and ko installed:
+
+```sh
+docker build -f Dockerfile.runtime -t ko.local/audio-scraper-runtime .
+ko build ./cmd --local --platform=linux/amd64
+```
+
+CI publishes the multi-platform runtime base and passes its digest to ko.
+`make deploy` builds the local runtime base and publishes the Go image with ko.

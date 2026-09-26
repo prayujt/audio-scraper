@@ -28,17 +28,13 @@ if [[ -n "${TAG:-}" ]]; then
 	tags+=("$TAG")
 fi
 
-build_args=()
-for t in "${tags[@]}"; do
-	build_args+=(-t "$IMAGE:$t")
-done
+command -v ko >/dev/null 2>&1 || {
+	echo "ko not found" >&2
+	exit 1
+}
 
-echo "building $IMAGE (${tags[*]}) ..." >&2
-docker build "${build_args[@]}" .
-
-for t in "${tags[@]}"; do
-	echo "pushing $IMAGE:$t ..." >&2
-	docker push "$IMAGE:$t"
-done
+docker build -f Dockerfile.runtime -t ko.local/audio-scraper-runtime .
+export KO_DOCKER_REPO="$IMAGE"
+ko build ./cmd --bare --tags="$(IFS=,; echo "${tags[*]}")"
 
 echo "deployed $IMAGE (${tags[*]})"
