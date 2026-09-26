@@ -1,0 +1,3 @@
+defaultBaseImage: ko.local/audio-scraper-runtime
+defaultEnv:
+  - CGO_ENABLED=0
